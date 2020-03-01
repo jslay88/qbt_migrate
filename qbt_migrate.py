@@ -22,7 +22,9 @@ def convert_slashes(path: str, target_os: str):
     if target_os.lower() not in ('windows', 'linux', 'mac'):
         raise ValueError('Target OS is not valid. Must be Windows, Linux, or Mac. Received: %s' % target_os)
     if target_os.lower() == 'windows':
+        logger.debug('Convert to Windows Slashes')
         return path.replace('/', '\\')
+    logger.debug('Convert to Unix Slashes')
     return path.replace('\\', '/')
 
 
@@ -162,11 +164,15 @@ class FastResume(object):
             path = convert_slashes(path, target_os)
         if create_backup:
             self.save(self.backup_filename)
+        path = bytes(path, 'utf-8')
+        logger.debug('Setting save_path... Old: %s, New: %s, Target OS: %s' % (self._qbt_save_path.decode('utf-8'),
+                                                                               path.decode('utf-8'),
+                                                                               target_os))
         self._data = self._data.replace(
             b'save_path' + bytes(str(len(self._save_path)), 'utf-8') + b':' + self._save_path,
-            b'save_path' + bytes(str(len(path)), 'utf-8') + b':' + bytes(path, 'utf-8')
+            b'save_path' + bytes(str(len(path)), 'utf-8') + b':' + path
         )
-        self._save_path = bytes(path, 'utf-8')
+        self._save_path = path
         if save_file:
             self.save()
 
@@ -177,11 +183,15 @@ class FastResume(object):
             path = convert_slashes(path, target_os)
         if create_backup:
             self.save(self.backup_filename)
+        path = bytes(path, 'utf-8')
+        logger.debug('Setting qBt-savePath... Old: %s, New: %s, Target OS: %s' % (self._qbt_save_path.decode('utf-8'),
+                                                                                  path.decode('utf-8'),
+                                                                                  target_os))
         self._data = self._data.replace(
             b'qBt-savePath' + bytes(str(len(self._qbt_save_path)), 'utf-8') + b':' + self._qbt_save_path,
-            b'qBt-savePath' + bytes(str(len(path)), 'utf-8') + b':' + bytes(path, 'utf-8')
+            b'qBt-savePath' + bytes(str(len(path)), 'utf-8') + b':' + path
         )
-        self._qbt_save_path = bytes(path, 'utf-8')
+        self._qbt_save_path = path
         if save_file:
             self.save()
 
@@ -207,13 +217,13 @@ if __name__ == '__main__':
     logger.setLevel('INFO')
     qbm = QBTBatchMove()
     bt_backup = input('BT_Backup Path (%s): ' % qbm.bt_backup_path)
-    if bt_backup != '':
+    if bt_backup.strip() != '':
         qbm.bt_backup_path = bt_backup
     ep = input('Existing Path: ')
     np = input('New Path: ')
     target = input('Target OS (Windows, Linux, Mac, Blank for same as existing): ')
     if target.strip() and target.lower() not in ('windows', 'linux', 'mac'):
         raise ValueError('Target OS is not valid. Must be Windows, Linux, or Mac. Received: %s' % target)
-    else:
+    elif not target.strip():
         target = None
     qbm.run(ep, np, target)
