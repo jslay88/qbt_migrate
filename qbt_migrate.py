@@ -162,11 +162,15 @@ class FastResume(object):
             path = convert_slashes(path, target_os)
         if create_backup:
             self.save(self.backup_filename)
+        path = bytes(path, 'utf-8')
+        logger.debug('Setting save_path... Old: %s, New: %s, Target OS: %s' % (self._qbt_save_path.decode('utf-8'),
+                                                                               path.decode('utf-8'),
+                                                                               target_os))
         self._data = self._data.replace(
             b'save_path' + bytes(str(len(self._save_path)), 'utf-8') + b':' + self._save_path,
-            b'save_path' + bytes(str(len(path)), 'utf-8') + b':' + bytes(path, 'utf-8')
+            b'save_path' + bytes(str(len(path)), 'utf-8') + b':' + path
         )
-        self._save_path = bytes(path, 'utf-8')
+        self._save_path = path
         if save_file:
             self.save()
 
@@ -177,11 +181,15 @@ class FastResume(object):
             path = convert_slashes(path, target_os)
         if create_backup:
             self.save(self.backup_filename)
+        path = bytes(path, 'utf-8')
+        logger.debug('Setting qBt-savePath... Old: %s, New: %s, Target OS: %s' % (self._qbt_save_path.decode('utf-8'),
+                                                                                  path.decode('utf-8'),
+                                                                                  target_os))
         self._data = self._data.replace(
             b'qBt-savePath' + bytes(str(len(self._qbt_save_path)), 'utf-8') + b':' + self._qbt_save_path,
-            b'qBt-savePath' + bytes(str(len(path)), 'utf-8') + b':' + bytes(path, 'utf-8')
+            b'qBt-savePath' + bytes(str(len(path)), 'utf-8') + b':' + path
         )
-        self._qbt_save_path = bytes(path, 'utf-8')
+        self._qbt_save_path = path
         if save_file:
             self.save()
 
