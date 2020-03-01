@@ -32,6 +32,14 @@ Run the script and follow prompts or use CLI arguments
                             Log Level, Default is INFO.
 
 
+By default, everything happens in the BT_Backup directory defined by the OS the script is running on.
+Override `BT_Backup` path if needed.
+
+Default BT_Backup paths:
+* Windows: `%LOCALAPPDATA%/qBittorrent/BT_Backup`
+* Linux/Mac: `$HOME/.local/share/data/qBittorrent/BT_backup`
+
+
 ### Examples
 Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `/torrents` when coming from Linux/Mac
 
