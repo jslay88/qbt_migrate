@@ -39,6 +39,8 @@ Default BT_Backup paths:
 * Windows: `%LOCALAPPDATA%/qBittorrent/BT_Backup`
 * Linux/Mac: `$HOME/.local/share/data/qBittorrent/BT_backup`
 
+A backup zip archive is automatically created in the directory that contains
+the `BT_Backup` directory. Default, for instance, would be the `qBittorrent` directory mentioned above.
 
 ### Examples
 Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `/torrents` when coming from Linux/Mac
