@@ -22,7 +22,9 @@ def convert_slashes(path: str, target_os: str):
     if target_os.lower() not in ('windows', 'linux', 'mac'):
         raise ValueError('Target OS is not valid. Must be Windows, Linux, or Mac. Received: %s' % target_os)
     if target_os.lower() == 'windows':
+        logger.debug('Convert to Windows Slashes')
         return path.replace('/', '\\')
+    logger.debug('Convert to Unix Slashes')
     return path.replace('\\', '/')
 
 
@@ -215,13 +217,13 @@ if __name__ == '__main__':
     logger.setLevel('INFO')
     qbm = QBTBatchMove()
     bt_backup = input('BT_Backup Path (%s): ' % qbm.bt_backup_path)
-    if bt_backup != '':
+    if bt_backup.strip() != '':
         qbm.bt_backup_path = bt_backup
     ep = input('Existing Path: ')
     np = input('New Path: ')
     target = input('Target OS (Windows, Linux, Mac, Blank for same as existing): ')
     if target.strip() and target.lower() not in ('windows', 'linux', 'mac'):
         raise ValueError('Target OS is not valid. Must be Windows, Linux, or Mac. Received: %s' % target)
-    else:
+    elif not target.strip():
         target = None
     qbm.run(ep, np, target)
