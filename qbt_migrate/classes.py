@@ -1,9 +1,9 @@
 import os
-import re
 import logging
 import zipfile
-
 from datetime import datetime
+
+import bencode
 
 from .methods import discover_bt_backup_path, convert_slashes
 
@@ -30,7 +30,7 @@ class QBTBatchMove(object):
         :type new_path: str
         :param target_os: If targeting a different OS than the source. Must be Windows, Linux, or Mac.
         :type target_os: str
-        :param create_backup: Create a backup of the file before modifying?
+        :param create_backup: Create a backup archive of the BT_Backup directory?
         :type create_backup: bool
         """
         if not os.path.exists(self.bt_backup_path) or not os.path.isdir(self.bt_backup_path):
@@ -48,19 +48,9 @@ class QBTBatchMove(object):
         self.logger.debug('Discovered FastResumes: %s' % self.discovered_files)
         for file in self.discovered_files:
             self.logger.info('Updating File %s...' % file.file_path)
-            new_save_path = file.save_path.replace(bytes(existing_path, 'utf-8'),
-                                                   bytes(new_path, 'utf-8'))
-            file.set_save_path(new_save_path.decode('utf-8'),
-                               target_os=target_os,
-                               save_file=False,
-                               create_backup=False)
-            new_qbt_save_path = file.qbt_save_path.replace(bytes(existing_path, 'utf-8'),
-                                                           bytes(new_path, 'utf-8'))
-            file.set_qbt_save_path(new_qbt_save_path.decode('utf-8'),
-                                   target_os=target_os,
-                                   save_file=False,
-                                   create_backup=False)
-            file.save()
+            new_save_path = file.save_path.replace(existing_path, new_path)
+            file.set_save_paths(path=new_save_path, target_os=target_os,
+                                save_file=True, create_backup=False)
             self.logger.info('File (%s) Updated!' % file.file_path)
 
     @staticmethod
@@ -74,7 +64,6 @@ class QBTBatchMove(object):
         :return: List of FastResume Objects
         :rtype: list[FastResume]
         """
-        existing_path = bytes(existing_path, 'utf-8')
         fast_resume_files = [FastResume(os.path.join(bt_backup_path, file))
                              for file in os.listdir(bt_backup_path)
                              if file.endswith('.fastresume')]
@@ -97,29 +86,16 @@ class FastResume(object):
     qBt_save_path_pattern = br'qBt-savePath(\d+)'
 
     def __init__(self, file_path: str):
-        self.file_path = os.path.realpath(file_path)
+        self._file_path = os.path.realpath(file_path)
         if not os.path.exists(self.file_path) or not os.path.isfile(self.file_path):
             raise FileNotFoundError(self.file_path)
-        self._save_path = None
-        self._qbt_save_path = None
-        self._pattern_save_path = re.compile(self.save_path_pattern)
-        self._pattern_qBt_save_path = re.compile(self.qBt_save_path_pattern)
-        self._data = None
-        self._load_data()
+        self._data = bencode.decode(open(self.file_path, 'rb').read())
+        if 'save_path' not in self._data or 'qBt-savePath' not in self._data:
+            raise ValueError('Missing required keys for a qBittorrent .fastresume file')
 
-    def _load_data(self):
-        with open(self.file_path, 'rb') as f:
-            self._data = f.read()
-        save_path_matches = self._pattern_save_path.search(self._data)
-        qbt_matches = self._pattern_qBt_save_path.search(self._data)
-        if save_path_matches is None:
-            raise ValueError('Unable to determine \'save_path\'')
-        if qbt_matches is None:
-            raise ValueError('Unable to determine \'qBt-savePath\'')
-        self._save_path = self._data[save_path_matches.end() + 1:
-                                     save_path_matches.end() + 1 + int(save_path_matches.group(1))]
-        self._qbt_save_path = self._data[qbt_matches.end() + 1:
-                                         qbt_matches.end() + 1 + int(qbt_matches.group(1))]
+    @property
+    def file_path(self):
+        return self._file_path
 
     @property
     def backup_filename(self):
@@ -129,47 +105,32 @@ class FastResume(object):
 
     @property
     def save_path(self):
-        return self._save_path
+        return self._data['save_path']
 
     @property
     def qbt_save_path(self):
-        return self._qbt_save_path
+        return self._data['qBt-savePath']
 
-    def set_save_path(self, path: str, target_os: str = None,
+    @property
+    def mapped_files(self):
+        if 'mapped_files' in self._data:
+            return self._data['mapped_files']
+        return None
+
+    def set_save_path(self, path: str, key: str = 'save_path', target_os: str = None,
                       save_file: bool = True, create_backup: bool = True):
-        if target_os is not None:
-            path = convert_slashes(path, target_os)
+        if key not in ['save_path', 'qBt-savePath']:
+            raise KeyError('When setting a save path, key must be `save_path` or `qBt-savePath`. '
+                           f'Received {key}')
         if create_backup:
             self.save(self.backup_filename)
-        path = bytes(path, 'utf-8')
-        self.logger.debug('Setting save_path... Old: %s, New: %s, Target OS: %s'
-                          % (self._qbt_save_path.decode('utf-8'),
-                             path.decode('utf-8'),
-                             target_os))
-        self._data = self._data.replace(
-            b'save_path' + bytes(str(len(self._save_path)), 'utf-8') + b':' + self._save_path,
-            b'save_path' + bytes(str(len(path)), 'utf-8') + b':' + path
-        )
-        self._save_path = path
-        if save_file:
-            self.save()
-
-    def set_qbt_save_path(self, path: str, target_os: str = None,
-                          save_file: bool = True, create_backup: bool = True):
         if target_os is not None:
             path = convert_slashes(path, target_os)
-        if create_backup:
-            self.save(self.backup_filename)
-        path = bytes(path, 'utf-8')
-        self.logger.debug('Setting qBt-savePath... Old: %s, New: %s, Target OS: %s'
-                          % (self._qbt_save_path.decode('utf-8'),
-                             path.decode('utf-8'),
+        self.logger.debug(f'Setting {key}... Old: %s, New: %s, Target OS: %s'
+                          % (self._data[key],
+                             path,
                              target_os))
-        self._data = self._data.replace(
-            b'qBt-savePath' + bytes(str(len(self._qbt_save_path)), 'utf-8') + b':' + self._qbt_save_path,
-            b'qBt-savePath' + bytes(str(len(path)), 'utf-8') + b':' + path
-        )
-        self._qbt_save_path = path
+        self._data[key] = path
         if save_file:
             self.save()
 
@@ -177,8 +138,11 @@ class FastResume(object):
                        save_file: bool = True, create_backup: bool = True):
         if create_backup:
             self.save(self.backup_filename)
-        self.set_save_path(path, target_os=target_os, save_file=False, create_backup=False)
-        self.set_qbt_save_path(path, target_os=target_os, save_file=False, create_backup=False)
+        self.set_save_path(path, key='save_path', target_os=target_os, save_file=False, create_backup=False)
+        self.set_save_path(path, key='qBt-savePath', target_os=target_os, save_file=False, create_backup=False)
+        if self.mapped_files is not None and target_os is not None:
+            self.logger.debug('Converting Slashes for mapped_files...')
+            self._data['mapped_files'] = [convert_slashes(path, target_os) for path in self.mapped_files]
         if save_file:
             self.save()
 
@@ -187,4 +151,4 @@ class FastResume(object):
             file_name = self.file_path
         self.logger.info('Saving File %s...' % file_name)
         with open(file_name, 'wb') as f:
-            f.write(self._data)
+            f.write(bencode.encode(self._data))
