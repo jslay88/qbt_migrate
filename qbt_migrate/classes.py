@@ -86,15 +86,13 @@ class QBTBatchMove(object):
 
 class FastResume(object):
     logger = logging.getLogger(__name__ + '.FastResume')
-    save_path_pattern = br'save_path(\d+)'
-    qBt_save_path_pattern = br'qBt-savePath(\d+)'
 
     def __init__(self, file_path: str):
         self._file_path = os.path.realpath(file_path)
         if not os.path.exists(self.file_path) or not os.path.isfile(self.file_path):
             raise FileNotFoundError(self.file_path)
         self.logger.debug(f'Loading Fast Resume: {self.file_path}')
-        self._data = bencode.decode(open(self.file_path, 'rb').read())
+        self._data = bencode.bread(self.file_path)
         if 'save_path' not in self._data or 'qBt-savePath' not in self._data:
             raise ValueError('Missing required keys for a qBittorrent .fastresume file')
         self.logger.debug(f'Fast Resume ({self.file_path}) Init Complete.')
@@ -156,5 +154,4 @@ class FastResume(object):
         if file_name is None:
             file_name = self.file_path
         self.logger.info('Saving File %s...' % file_name)
-        with open(file_name, 'wb') as f:
-            f.write(bencode.encode(self._data))
+        bencode.bwrite(self._data, file_name)
