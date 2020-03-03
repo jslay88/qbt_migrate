@@ -1,6 +1,7 @@
 import os
 import logging
 import zipfile
+from threading import Thread
 from datetime import datetime
 
 import bencode
@@ -39,19 +40,12 @@ class QBTBatchMove(object):
             backup_filename = 'fastresume_backup' + datetime.now().strftime('%Y%m%d%H%M%S') + '.zip'
             self.backup_folder(self.bt_backup_path,
                                os.path.join(os.path.dirname(self.bt_backup_path), backup_filename))
+
         self.logger.info('Searching for .fastresume files with path %s ...' % existing_path)
-        self.discovered_files = self.discover_relevant_fast_resume(self.bt_backup_path,
-                                                                   existing_path)
-        if not self.discovered_files:
-            raise ValueError('Found no .fastresume files with existing path %s' % existing_path)
-        self.logger.info('Found %s Files.' % len(self.discovered_files))
-        self.logger.debug('Discovered FastResumes: %s' % self.discovered_files)
-        for file in self.discovered_files:
-            self.logger.info('Updating File %s...' % file.file_path)
-            new_save_path = file.save_path.replace(existing_path, new_path)
-            file.set_save_paths(path=new_save_path, target_os=target_os,
-                                save_file=True, create_backup=False)
-            self.logger.info('File (%s) Updated!' % file.file_path)
+        for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path):
+            # Fire and forget
+            Thread(target=self.update_fastresume, args=[fast_resume, existing_path, new_path,
+                                                        target_os, True, False]).start()
 
     @staticmethod
     def discover_relevant_fast_resume(bt_backup_path: str, existing_path: str):
@@ -64,12 +58,13 @@ class QBTBatchMove(object):
         :return: List of FastResume Objects
         :rtype: list[FastResume]
         """
-        fast_resume_files = [FastResume(os.path.join(bt_backup_path, file))
-                             for file in os.listdir(bt_backup_path)
-                             if file.endswith('.fastresume')]
-        fast_resume_files = [file for file in fast_resume_files if existing_path in file.save_path
-                             or existing_path in file.qbt_save_path]
-        return fast_resume_files
+        for file in os.listdir(bt_backup_path):
+            if file.endswith('.fastresume'):
+                fast_resume = FastResume(os.path.join(bt_backup_path, file))
+                if existing_path in fast_resume.save_path or \
+                        existing_path in fast_resume.qbt_save_path:
+                    yield fast_resume
+        return
 
     @classmethod
     def backup_folder(cls, folder_path, archive_path):
@@ -78,6 +73,15 @@ class QBTBatchMove(object):
             for file in os.listdir(folder_path):
                 archive.write(os.path.join(folder_path, file))
         cls.logger.info('Done!')
+
+    @classmethod
+    def update_fastresume(cls, fast_resume: 'FastResume', existing_path: str, new_path: str,
+                          target_os: str = None, save_file: bool = True, create_backup: bool = True):
+        cls.logger.info('Updating FastResume %s...' % fast_resume.file_path)
+        new_save_path = fast_resume.save_path.replace(existing_path, new_path)
+        fast_resume.set_save_paths(path=new_save_path, target_os=target_os,
+                                   save_file=save_file, create_backup=create_backup)
+        cls.logger.info('FastResume (%s) Updated!' % fast_resume.file_path)
 
 
 class FastResume(object):
@@ -89,9 +93,11 @@ class FastResume(object):
         self._file_path = os.path.realpath(file_path)
         if not os.path.exists(self.file_path) or not os.path.isfile(self.file_path):
             raise FileNotFoundError(self.file_path)
+        self.logger.debug(f'Loading Fast Resume: {self.file_path}')
         self._data = bencode.decode(open(self.file_path, 'rb').read())
         if 'save_path' not in self._data or 'qBt-savePath' not in self._data:
             raise ValueError('Missing required keys for a qBittorrent .fastresume file')
+        self.logger.debug(f'Fast Resume ({self.file_path}) Init Complete.')
 
     @property
     def file_path(self):
