@@ -12,6 +12,10 @@ Clone the repo
     
     git clone https://github.com/jslay88/qbt_migrate
     
+Install requirements
+
+    pip install -r requirements.txt
+    
 Run the script and follow prompts or use CLI arguments
 
     usage: cli.py [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-t {Windows,Linux,Mac}]
@@ -52,6 +56,3 @@ Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `
     
     python cli.py -e /torrents -n /new/path/for/torrents  # Changes torrent root path on Linux/Mac
     python cli.py -e /torrents -n Z:\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)
-    
-
-    
