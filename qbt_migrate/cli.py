@@ -1,7 +1,7 @@
 import logging
 import argparse
 
-from qbt_migrate import QBTBatchMove, discover_bt_backup_path
+from . import QBTBatchMove, discover_bt_backup_path
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+def main():
     args = parse_args()
     logging.basicConfig()
     logger.setLevel(args.log_level)
@@ -47,3 +47,7 @@ if __name__ == '__main__':
     elif not args.target_os.strip():
         args.target_os = None
     qbm.run(args.existing_path, args.new_path, args.target_os)
+
+
+if __name__ == '__main__':
+    main()

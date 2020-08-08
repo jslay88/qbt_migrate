@@ -7,18 +7,14 @@ It can also convert slashes when migrating between Windows and Linux/Mac.
 
 ## Usage
 
-Install [Python 3](https://python.org).
-Clone the repo
-    
-    git clone https://github.com/jslay88/qbt_migrate
-    
-Install requirements
+Install from PyPi using `pip`
 
-    pip install -r requirements.txt
+    pip install qbt-migrate
     
-Run the script and follow prompts or use CLI arguments
+    
+Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
-    usage: cli.py [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-t {Windows,Linux,Mac}]
+    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-t {Windows,Linux,Mac}]
               [-b BT_BACKUP_PATH] [-l {DEBUG,INFO}]
     
     optional arguments:
