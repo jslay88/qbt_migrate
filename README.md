@@ -45,10 +45,10 @@ the `BT_Backup` directory. Default, for instance, would be the `qBittorrent` dir
 ### Examples
 Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `/torrents` when coming from Linux/Mac
 
-    python cli.py -e X:\ -n Z:\ -t Windows  # Windows to Windows (Drive letter change)
-    python cli.py -e X:\Torrents -n X:\NewDir\Torrents -t Windows  # Windows to Windows (Directory Change)
-    python cli.py -e X:\Torrents -n Z:\NewDir\Torrents -t Windows  # Windows to Windows (Drive letter change with directory change)
-    python cli.py -e X:\Torrents -n /torrents -t Linux  # Windows to Linux/Mac (converts slashes)
+    qbt_migrate -e X:\ -n Z:\ -t Windows  # Windows to Windows (Drive letter change)
+    qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows  # Windows to Windows (Directory Change)
+    qbt_migrate -e X:\Torrents -n Z:\NewDir\Torrents -t Windows  # Windows to Windows (Drive letter change with directory change)
+    qbt_migrate -e X:\Torrents -n /torrents -t Linux  # Windows to Linux/Mac (converts slashes)
     
-    python cli.py -e /torrents -n /new/path/for/torrents  # Changes torrent root path on Linux/Mac
-    python cli.py -e /torrents -n Z:\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)
+    qbt_migrate -e /torrents -n /new/path/for/torrents  # Changes torrent root path on Linux/Mac
+    qbt_migrate -e /torrents -n Z:\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)
