@@ -3,6 +3,7 @@ import logging
 import zipfile
 from threading import Thread
 from datetime import datetime
+from typing import Optional
 
 import bencode
 
@@ -22,7 +23,8 @@ class QBTBatchMove(object):
         self.bt_backup_path = bt_backup_path
         self.discovered_files = None
 
-    def run(self, existing_path: str, new_path: str, target_os: str = None, create_backup: bool = True):
+    def run(self, existing_path: str, new_path: str, target_os: Optional[str] = None,
+            create_backup: bool = True, skip_bad_files: bool = False):
         """
         Perform Batch Processing of path changes.
         :param existing_path: Existing path to look for
@@ -33,6 +35,8 @@ class QBTBatchMove(object):
         :type target_os: str
         :param create_backup: Create a backup archive of the BT_Backup directory?
         :type create_backup: bool
+        :param skip_bad_files: Skip .fastresume files that cannot be read successfully.
+        :type skip_bad_files: bool
         """
         if not os.path.exists(self.bt_backup_path) or not os.path.isdir(self.bt_backup_path):
             raise NotADirectoryError(self.bt_backup_path)
@@ -42,33 +46,46 @@ class QBTBatchMove(object):
                                os.path.join(os.path.dirname(self.bt_backup_path), backup_filename))
 
         self.logger.info('Searching for .fastresume files with path %s ...' % existing_path)
-        for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path):
+        for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path, not skip_bad_files):
             # Fire and forget
-            Thread(target=self.update_fastresume, args=[fast_resume, existing_path, new_path,
-                                                        target_os, True, False]).start()
+            Thread(target=fast_resume.replace_paths, args=[existing_path, new_path,
+                                                           target_os, True, False]).start()
 
-    @staticmethod
-    def discover_relevant_fast_resume(bt_backup_path: str, existing_path: str):
+    @classmethod
+    def discover_relevant_fast_resume(cls, bt_backup_path: str, existing_path: str, raise_on_error: bool = True):
         """
         Find .fastresume files that contain the existing path.
         :param bt_backup_path: Path to BT_backup folder
         :type bt_backup_path: str
         :param existing_path: The existing path to look for
         :type existing_path: str
+        :param raise_on_error: Raise if error parsing .fastresume files
+        :type raise_on_error: bool
         :return: List of FastResume Objects
         :rtype: list[FastResume]
         """
         for file in os.listdir(bt_backup_path):
             if file.endswith('.fastresume'):
-                fast_resume = FastResume(os.path.join(bt_backup_path, file))
+                try:
+                    fast_resume = FastResume(os.path.join(bt_backup_path, file))
+                except (
+                    bencode.exceptions.BencodeDecodeError,
+                    FileNotFoundError,
+                    ValueError
+                ) as e:
+                    if raise_on_error:
+                        cls.logger.critical(f'Unable to parse {file}. Stopping Discovery!')
+                        raise e
+                    cls.logger.warning(f'Unable to parse {file}. Skipping!\n\n{e}')
+                    continue
                 if existing_path in fast_resume.save_path or \
                         existing_path in fast_resume.qbt_save_path:
                     yield fast_resume
         return
 
     @classmethod
-    def backup_folder(cls, folder_path, archive_path):
-        cls.logger.info('Creating Archive %s ...' % archive_path)
+    def backup_folder(cls, folder_path: str, archive_path: str):
+        cls.logger.info(f'Creating Archive {archive_path} ...')
         with zipfile.ZipFile(archive_path, 'w') as archive:
             for file in os.listdir(folder_path):
                 archive.write(os.path.join(folder_path, file))
@@ -76,12 +93,8 @@ class QBTBatchMove(object):
 
     @classmethod
     def update_fastresume(cls, fast_resume: 'FastResume', existing_path: str, new_path: str,
-                          target_os: str = None, save_file: bool = True, create_backup: bool = True):
-        cls.logger.info('Updating FastResume %s...' % fast_resume.file_path)
-        new_save_path = fast_resume.save_path.replace(existing_path, new_path)
-        fast_resume.set_save_paths(path=new_save_path, target_os=target_os,
-                                   save_file=save_file, create_backup=create_backup)
-        cls.logger.info('FastResume (%s) Updated!' % fast_resume.file_path)
+                          target_os: Optional[str] = None, save_file: bool = True, create_backup: bool = True):
+        fast_resume.replace_paths(existing_path, new_path, target_os, save_file, create_backup)
 
 
 class FastResume(object):
@@ -121,7 +134,7 @@ class FastResume(object):
             return self._data['mapped_files']
         return None
 
-    def set_save_path(self, path: str, key: str = 'save_path', target_os: str = None,
+    def set_save_path(self, path: str, key: str = 'save_path', target_os: Optional[str] = None,
                       save_file: bool = True, create_backup: bool = True):
         if key not in ['save_path', 'qBt-savePath']:
             raise KeyError('When setting a save path, key must be `save_path` or `qBt-savePath`. '
@@ -130,15 +143,12 @@ class FastResume(object):
             self.save(self.backup_filename)
         if target_os is not None:
             path = convert_slashes(path, target_os)
-        self.logger.debug(f'Setting {key}... Old: %s, New: %s, Target OS: %s'
-                          % (self._data[key],
-                             path,
-                             target_os))
+        self.logger.debug(f'Setting {key}... Old: {self._data[key]}, New: {path}, Target OS: {target_os}')
         self._data[key] = path
         if save_file:
             self.save()
 
-    def set_save_paths(self, path: str, target_os: str = None,
+    def set_save_paths(self, path: str, target_os: Optional[str] = None,
                        save_file: bool = True, create_backup: bool = True):
         if create_backup:
             self.save(self.backup_filename)
@@ -150,8 +160,18 @@ class FastResume(object):
         if save_file:
             self.save()
 
-    def save(self, file_name=None):
+    def save(self, file_name: Optional[str] = None):
         if file_name is None:
             file_name = self.file_path
-        self.logger.info('Saving File %s...' % file_name)
+        self.logger.info(f'Saving File {file_name}...')
         bencode.bwrite(self._data, file_name)
+
+    def replace_paths(self, existing_path: str, new_path: str, target_os: Optional[str] = None,
+                      save_file: bool = True, create_backup: bool = True):
+        self.logger.info(f'Replacing Paths in FastResume {self.file_path}...')
+        new_save_path = self.save_path.replace(existing_path, new_path)
+        self.logger.debug(f'Existing Save Path: {existing_path}, New Save Path: {new_path}, '
+                          f'Replaced Save Path: {new_save_path}')
+        self.set_save_paths(path=str(new_save_path), target_os=target_os,
+                            save_file=save_file, create_backup=create_backup)
+        self.logger.info(f'FastResume ({self.file_path}) Paths Replaced!')
