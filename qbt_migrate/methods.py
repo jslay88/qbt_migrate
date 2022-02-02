@@ -8,10 +8,12 @@ logger = logging.getLogger(__name__)
 
 def discover_bt_backup_path():
     logger.debug('Discovering BT_backup path...')
+    if sys.platform.startswith('linux') and os.path.exists("/.dockerenv"):
+        # Default path for config under for image: https://docs.linuxserver.io/images/docker-qbittorrent
+        return os.path.join("/config/qBittorrent/BT_backup")
     if sys.platform.startswith('win32'):
         logger.debug('Windows System')
         return os.path.join(os.getenv('localappdata'), 'qBittorrent\\BT_backup')
-
     logger.debug('Linux/Mac System')
     return os.path.join(os.getenv('HOME'), '.local/share/data/qBittorrent/BT_backup')
 

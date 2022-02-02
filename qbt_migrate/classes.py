@@ -19,7 +19,7 @@ class QBTBatchMove(object):
     def __init__(self, bt_backup_path: str = None):
         if bt_backup_path is None:
             bt_backup_path = discover_bt_backup_path()
-        self.logger.debug('BT_backup Path: %s' % bt_backup_path)
+        self.logger.debug('BT_backup Path: %s', bt_backup_path)
         self.bt_backup_path = bt_backup_path
         self.discovered_files = None
 
@@ -41,11 +41,11 @@ class QBTBatchMove(object):
         if not os.path.exists(self.bt_backup_path) or not os.path.isdir(self.bt_backup_path):
             raise NotADirectoryError(self.bt_backup_path)
         if create_backup:
-            backup_filename = 'fastresume_backup' + datetime.now().strftime('%Y%m%d%H%M%S') + '.zip'
+            backup_filename = f'fastresume_backup{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
             self.backup_folder(self.bt_backup_path,
                                os.path.join(os.path.dirname(self.bt_backup_path), backup_filename))
 
-        self.logger.info('Searching for .fastresume files with path %s ...' % existing_path)
+        self.logger.info('Searching for .fastresume files with path %s ...', existing_path)
         for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path, not skip_bad_files):
             # Fire and forget
             Thread(target=fast_resume.replace_paths, args=[existing_path, new_path,
@@ -86,8 +86,9 @@ class QBTBatchMove(object):
     @classmethod
     def backup_folder(cls, folder_path: str, archive_path: str):
         cls.logger.info(f'Creating Archive {archive_path} ...')
+        files_to_archive = os.listdir(folder_path)
         with zipfile.ZipFile(archive_path, 'w') as archive:
-            for file in os.listdir(folder_path):
+            for file in files_to_archive:
                 archive.write(os.path.join(folder_path, file))
         cls.logger.info('Done!')
 
@@ -116,9 +117,7 @@ class FastResume(object):
 
     @property
     def backup_filename(self):
-        return '%s.%s.%s' % (self.file_path,
-                             datetime.now().strftime('%Y%m%d%H%M%S'),
-                             'bkup')
+        return f'{self.file_path}.{datetime.now().strftime("%Y%m%d%H%M%S")}.bkup'
 
     @property
     def save_path(self):

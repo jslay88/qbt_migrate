@@ -46,7 +46,7 @@ def main():
         args.new_path = input('New Path: ')
     if args.target_os is None:
         args.target_os = input('Target OS (Windows, Linux, Mac, Blank for auto-detect): ')
-    if args.target_os.strip() and args.target_os.lower() not in ('windows', 'linux', 'mac'):
+    if args.target_os.strip() and args.target_os.strip().lower() not in ('windows', 'linux', 'mac'):
         raise ValueError('Target OS is not valid. Must be Windows, Linux, or Mac. Received: %s' % args.target_os)
     elif not args.target_os.strip():
         if '/' in args.existing_path and '\\' in args.new_path:
