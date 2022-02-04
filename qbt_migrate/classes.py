@@ -5,7 +5,11 @@ from threading import Thread
 from datetime import datetime
 from typing import Optional
 
-import bencode
+import bencodepy
+
+# encoding: "utf-8", to attempt to encode to utf-8 which converts normal strings for python
+# encoding_fallback: "all", will fallback to using binary if utf-8 fails at any part
+bencode = bencodepy.Bencode(encoding="utf-8", encoding_fallback="all")
 
 from .methods import discover_bt_backup_path, convert_slashes
 
@@ -69,7 +73,7 @@ class QBTBatchMove(object):
                 try:
                     fast_resume = FastResume(os.path.join(bt_backup_path, file))
                 except (
-                    bencode.exceptions.BencodeDecodeError,
+                    bencodepy.exceptions.BencodeDecodeError,
                     FileNotFoundError,
                     ValueError
                 ) as e:
@@ -106,7 +110,7 @@ class FastResume(object):
         if not os.path.exists(self.file_path) or not os.path.isfile(self.file_path):
             raise FileNotFoundError(self.file_path)
         self.logger.debug(f'Loading Fast Resume: {self.file_path}')
-        self._data = bencode.bread(self.file_path)
+        self._data = bencode.read(self.file_path)
         if 'save_path' not in self._data or 'qBt-savePath' not in self._data:
             raise ValueError('Missing required keys for a qBittorrent .fastresume file')
         self.logger.debug(f'Fast Resume ({self.file_path}) Init Complete.')
@@ -163,7 +167,7 @@ class FastResume(object):
         if file_name is None:
             file_name = self.file_path
         self.logger.info(f'Saving File {file_name}...')
-        bencode.bwrite(self._data, file_name)
+        bencode.write(self._data, file_name)
 
     def replace_paths(self, existing_path: str, new_path: str, target_os: Optional[str] = None,
                       save_file: bool = True, create_backup: bool = True):
