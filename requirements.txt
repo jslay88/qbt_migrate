@@ -1,1 +1,1 @@
-bencode.py==2.1.0
+bencode.py==4.0.0

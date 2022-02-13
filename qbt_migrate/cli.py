@@ -15,8 +15,8 @@ def parse_args():
                                                   'Default will auto-detect if conversion is needed '
                                                   'based on existing vs new.',
                         choices=['Windows', 'Linux', 'Mac'])
-    parser.add_argument('-b', '--bt-backup-path', help='BT_Backup Path Override. Default is %s'
-                                                       % discover_bt_backup_path())
+    parser.add_argument('-b', '--bt-backup-path', help='BT_Backup Path Override. '
+                                                       f'Default is {discover_bt_backup_path()}')
     parser.add_argument('-s', '--skip-bad-files', help='Skips bad .fastresume files instead of exiting. '
                                                        'Default behavior is to exit.',
                         action='store_true', default=False)
@@ -37,7 +37,7 @@ def main():
     if args.bt_backup_path is not None:
         qbm.bt_backup_path = args.bt_backup_path
     else:
-        bt_backup_path = input('BT_Backup Path (%s): ' % qbm.bt_backup_path)
+        bt_backup_path = input(f'BT_Backup Path {qbm.bt_backup_path}: ')
         if bt_backup_path.strip():
             qbm.bt_backup_path = bt_backup_path
     if args.existing_path is None:
@@ -46,8 +46,8 @@ def main():
         args.new_path = input('New Path: ')
     if args.target_os is None:
         args.target_os = input('Target OS (Windows, Linux, Mac, Blank for auto-detect): ')
-    if args.target_os.strip() and args.target_os.lower() not in ('windows', 'linux', 'mac'):
-        raise ValueError('Target OS is not valid. Must be Windows, Linux, or Mac. Received: %s' % args.target_os)
+    if args.target_os.strip() and args.target_os.strip().lower() not in ('windows', 'linux', 'mac'):
+        raise ValueError(f'Target OS is not valid. Must be Windows, Linux, or Mac. Received:{args.target_os}')
     elif not args.target_os.strip():
         if '/' in args.existing_path and '\\' in args.new_path:
             logger.info('Auto detected target OS change. Will convert slashes to Windows.')
@@ -57,7 +57,9 @@ def main():
             args.target_os = 'linux'
         else:
             args.target_os = None
-    qbm.run(args.existing_path, args.new_path, args.target_os, args.skip_bad_files)
+    logger.debug(f'Existing Path: {args.existing_path}, New Path: {args.new_path}, '
+                 f'Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}')
+    qbm.run(args.existing_path, args.new_path, args.target_os, True, args.skip_bad_files)
 
 
 if __name__ == '__main__':

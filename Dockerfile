@@ -7,4 +7,6 @@ COPY setup.py setup.py
 COPY LICENSE.md LICENSE.md
 COPY README.md README.md
 RUN pip install -e .
-ENTRYPOINT ["/bin/sh", "-c", "qbt_migrate -b $BT_BACKUP_PATH"]
+RUN printf '#!/bin/ash\nexec qbt_migrate -b $BT_BACKUP_PATH $@' > entrypoint.sh
+RUN chmod +x entrypoint.sh
+ENTRYPOINT ["./entrypoint.sh"]
