@@ -89,3 +89,13 @@ You can also clone this repository, build the image, and run your own built imag
     docker build . -t qbt_migrate
     docker run -v %LOCALAPPDATA%/qBittorrent/BT_Backup:/tmp/BT_backup qbt_migrate -e X:\ -n Z:\  # Windows to Windows (Drive letter change)
     ...
+
+
+## Python Module
+This project has also been built to be module and used as a Python Module. If you feel like utilizing this project within your own, 
+please feel free to do so, and let me know!
+
+Use Cases:
+* UI for qbt_migrate
+* `FastResume` Class
+* Torrent Manager
