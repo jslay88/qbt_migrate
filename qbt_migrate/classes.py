@@ -1,16 +1,17 @@
 import os
 import logging
-import zipfile
 from threading import Thread
 from datetime import datetime
 from typing import Optional
 
-import bencode
+import bencodepy
+from bencodepy.exceptions import BencodeDecodeError
 
-from .methods import discover_bt_backup_path, convert_slashes
+from .methods import discover_bt_backup_path, convert_slashes, backup_folder
 
 
 logger = logging.getLogger(__name__)
+bencode = bencodepy.Bencode(encoding="utf-8", encoding_fallback="all")
 
 
 class QBTBatchMove(object):
@@ -19,7 +20,7 @@ class QBTBatchMove(object):
     def __init__(self, bt_backup_path: str = None):
         if bt_backup_path is None:
             bt_backup_path = discover_bt_backup_path()
-        self.logger.debug('BT_backup Path: %s' % bt_backup_path)
+        self.logger.debug(f'BT_backup Path: {bt_backup_path}')
         self.bt_backup_path = bt_backup_path
         self.discovered_files = None
 
@@ -41,11 +42,11 @@ class QBTBatchMove(object):
         if not os.path.exists(self.bt_backup_path) or not os.path.isdir(self.bt_backup_path):
             raise NotADirectoryError(self.bt_backup_path)
         if create_backup:
-            backup_filename = 'fastresume_backup' + datetime.now().strftime('%Y%m%d%H%M%S') + '.zip'
+            backup_filename = f'fastresume_backup{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
             self.backup_folder(self.bt_backup_path,
-                               os.path.join(os.path.dirname(self.bt_backup_path), backup_filename))
+                               os.path.join(self.bt_backup_path, backup_filename))
 
-        self.logger.info('Searching for .fastresume files with path %s ...' % existing_path)
+        self.logger.info(f'Searching for .fastresume files with path {existing_path} ...')
         for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path, not skip_bad_files):
             # Fire and forget
             Thread(target=fast_resume.replace_paths, args=[existing_path, new_path,
@@ -69,7 +70,7 @@ class QBTBatchMove(object):
                 try:
                     fast_resume = FastResume(os.path.join(bt_backup_path, file))
                 except (
-                    bencode.exceptions.BencodeDecodeError,
+                    BencodeDecodeError,
                     FileNotFoundError,
                     ValueError
                 ) as e:
@@ -85,11 +86,7 @@ class QBTBatchMove(object):
 
     @classmethod
     def backup_folder(cls, folder_path: str, archive_path: str):
-        cls.logger.info(f'Creating Archive {archive_path} ...')
-        with zipfile.ZipFile(archive_path, 'w') as archive:
-            for file in os.listdir(folder_path):
-                archive.write(os.path.join(folder_path, file))
-        cls.logger.info('Done!')
+        return backup_folder(folder_path, archive_path)
 
     @classmethod
     def update_fastresume(cls, fast_resume: 'FastResume', existing_path: str, new_path: str,
@@ -105,34 +102,31 @@ class FastResume(object):
         if not os.path.exists(self.file_path) or not os.path.isfile(self.file_path):
             raise FileNotFoundError(self.file_path)
         self.logger.debug(f'Loading Fast Resume: {self.file_path}')
-        self._data = bencode.bread(self.file_path)
-        if 'save_path' not in self._data or 'qBt-savePath' not in self._data:
-            raise ValueError('Missing required keys for a qBittorrent .fastresume file')
+        self._data = bencode.read(self.file_path)
         self.logger.debug(f'Fast Resume ({self.file_path}) Init Complete.')
 
     @property
-    def file_path(self):
+    def file_path(self) -> str:
         return self._file_path
 
     @property
-    def backup_filename(self):
-        return '%s.%s.%s' % (self.file_path,
-                             datetime.now().strftime('%Y%m%d%H%M%S'),
-                             'bkup')
+    def backup_filename(self) -> str:
+        return f'{self.file_path}.{datetime.now().strftime("%Y%m%d%H%M%S")}.bkup'
 
     @property
-    def save_path(self):
-        return self._data['save_path']
+    def save_path(self) -> Optional[str]:
+        if 'save_path' in self._data:
+            return self._data['save_path']
 
     @property
-    def qbt_save_path(self):
-        return self._data['qBt-savePath']
+    def qbt_save_path(self) -> Optional[str]:
+        if 'qBt-savePath' in self._data:
+            return self._data['qBt-savePath']
 
     @property
     def mapped_files(self):
         if 'mapped_files' in self._data:
             return self._data['mapped_files']
-        return None
 
     def set_save_path(self, path: str, key: str = 'save_path', target_os: Optional[str] = None,
                       save_file: bool = True, create_backup: bool = True):
@@ -148,12 +142,15 @@ class FastResume(object):
         if save_file:
             self.save()
 
-    def set_save_paths(self, path: str, target_os: Optional[str] = None,
+    def set_save_paths(self, path: Optional[str], qbt_path: Optional[str] = None, target_os: Optional[str] = None,
                        save_file: bool = True, create_backup: bool = True):
         if create_backup:
             self.save(self.backup_filename)
-        self.set_save_path(path, key='save_path', target_os=target_os, save_file=False, create_backup=False)
-        self.set_save_path(path, key='qBt-savePath', target_os=target_os, save_file=False, create_backup=False)
+        if path:
+            self.set_save_path(path, key='save_path', target_os=target_os, save_file=False, create_backup=False)
+        qbt_path = path if qbt_path is None else qbt_path
+        if qbt_path:
+            self.set_save_path(qbt_path, key='qBt-savePath', target_os=target_os, save_file=False, create_backup=False)
         if self.mapped_files is not None and target_os is not None:
             self.logger.debug('Converting Slashes for mapped_files...')
             self._data['mapped_files'] = [convert_slashes(path, target_os) for path in self.mapped_files]
@@ -164,14 +161,16 @@ class FastResume(object):
         if file_name is None:
             file_name = self.file_path
         self.logger.info(f'Saving File {file_name}...')
-        bencode.bwrite(self._data, file_name)
+        bencode.write(self._data, file_name)
 
     def replace_paths(self, existing_path: str, new_path: str, target_os: Optional[str] = None,
                       save_file: bool = True, create_backup: bool = True):
         self.logger.info(f'Replacing Paths in FastResume {self.file_path}...')
-        new_save_path = self.save_path.replace(existing_path, new_path)
+        new_save_path = self.save_path.replace(existing_path, new_path) if self.save_path is not None else None
+        new_qbt_save_path = self.qbt_save_path.replace(existing_path, new_path) \
+            if self.qbt_save_path is not None else None
         self.logger.debug(f'Existing Save Path: {existing_path}, New Save Path: {new_path}, '
                           f'Replaced Save Path: {new_save_path}')
-        self.set_save_paths(path=str(new_save_path), target_os=target_os,
+        self.set_save_paths(path=str(new_save_path), qbt_path=new_qbt_save_path, target_os=target_os,
                             save_file=save_file, create_backup=create_backup)
         self.logger.info(f'FastResume ({self.file_path}) Paths Replaced!')
