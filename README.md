@@ -92,7 +92,7 @@ You can also clone this repository, build the image, and run your own built imag
 
 
 ## Python Module
-This project has also been built to be module and used as a Python Module. If you feel like utilizing this project within your own, 
+This project has also been built to be modular and used as a Python Module. If you feel like utilizing this project within your own, 
 please feel free to do so, and let me know!
 
 Use Cases:
