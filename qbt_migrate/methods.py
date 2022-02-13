@@ -13,7 +13,7 @@ def discover_bt_backup_path():
         logger.debug('Windows System')
         return os.path.join(os.getenv('localappdata'), 'qBittorrent\\BT_backup')
 
-    if os.path.isfile("/.dockerenv") and os.path.isdir('/config/qBittorrent/BT_backup'):
+    if os.path.isfile('/.dockerenv') and os.path.isdir('/config/qBittorrent/BT_backup'):
         # Default path for config under for image: https://docs.linuxserver.io/images/docker-qbittorrent
         logger.debug('qBittorrent Docker container detected')
         return '/config/qBittorrent/BT_backup'
@@ -36,5 +36,7 @@ def backup_folder(folder_path: str, archive_path: str):
     logger.info(f'Creating Archive {archive_path} ...')
     with zipfile.ZipFile(archive_path, 'w') as archive:
         for file in os.listdir(folder_path):
+            if file.startswith('fastresume') and file.endswith('.zip'):
+                continue
             archive.write(os.path.join(folder_path, file))
     logger.info('Done!')
