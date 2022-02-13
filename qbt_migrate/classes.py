@@ -1,5 +1,6 @@
 import os
 import logging
+import shutil
 from threading import Thread
 from datetime import datetime
 from typing import Optional
@@ -44,7 +45,11 @@ class QBTBatchMove(object):
         if create_backup:
             backup_filename = f'fastresume_backup{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
             self.backup_folder(self.bt_backup_path,
-                               os.path.join(self.bt_backup_path, backup_filename))
+                               os.path.join(os.path.dirname(self.bt_backup_path), backup_filename))
+            if os.path.isfile('/.dockerenv') and self.bt_backup_path == '/tmp/BT_backup':
+                # Shove backup in /tmp/BT_backup for Docker (not qBittorrent Docker) for persistence
+                shutil.move(os.path.join(os.path.dirname(self.bt_backup_path), backup_filename),
+                            os.path.join(self.bt_backup_path, backup_filename))
 
         self.logger.info(f'Searching for .fastresume files with path {existing_path} ...')
         for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path, not skip_bad_files):
