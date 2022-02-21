@@ -2,6 +2,8 @@ import os
 import sys
 import logging
 import zipfile
+from pathlib import Path
+from typing import Union
 
 
 logger = logging.getLogger(__name__)
@@ -32,11 +34,14 @@ def convert_slashes(path: str, target_os: str):
     return path.replace('\\', '/')
 
 
-def backup_folder(folder_path: str, archive_path: str):
+def backup_folder(folder_path: Union[str, os.PathLike], archive_path: Union[str, os.PathLike]):
     logger.info(f'Creating Archive {archive_path} ...')
+    folder_path = Path(folder_path)
+    archive_path = Path(archive_path)
     with zipfile.ZipFile(archive_path, 'w') as archive:
-        for file in os.listdir(folder_path):
-            if file.startswith('fastresume') and file.endswith('.zip'):
+        for file in folder_path.iterdir():
+            if file == archive_path:
                 continue
-            archive.write(os.path.join(folder_path, file))
+            logger.debug(f'Archiving {file} into {archive_path}...')
+            archive.write(file)
     logger.info('Done!')
