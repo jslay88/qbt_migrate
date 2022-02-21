@@ -11,7 +11,7 @@ with open('requirements.txt', 'r') as f:
 
 setup(
     name='qbt_migrate',
-    version='2.1.3',
+    version='2.1.4',
     packages=find_packages(),
     install_requires=dependencies,
     description='Migrate qBittorrent FastResume files.',

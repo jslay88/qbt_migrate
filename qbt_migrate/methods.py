@@ -34,14 +34,14 @@ def convert_slashes(path: str, target_os: str):
     return path.replace('\\', '/')
 
 
-def backup_folder(folder_path: Union[str, os.PathLike], archive_path: Union[str, os.PathLike]):
+def backup_folder(folder_path: Union[str, os.PathLike], archive_path: Union[str, os.PathLike],
+                  include_torrents: bool = True):
     logger.info(f'Creating Archive {archive_path} ...')
     folder_path = Path(folder_path)
     archive_path = Path(archive_path)
     with zipfile.ZipFile(archive_path, 'w') as archive:
         for file in folder_path.iterdir():
-            if file == archive_path:
-                continue
-            logger.debug(f'Archiving {file} into {archive_path}...')
-            archive.write(file)
+            if file.name.endswith('.fastresume') or (include_torrents and file.name.endswith('.torrent')):
+                logger.debug(f'Archiving {file} into {archive_path}...')
+                archive.write(file)
     logger.info('Done!')
