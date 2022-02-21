@@ -1,7 +1,5 @@
 import os
 import logging
-import shutil
-import zipfile
 from threading import Thread
 from datetime import datetime
 from typing import Optional
@@ -41,26 +39,17 @@ class QBTBatchMove(object):
         :param skip_bad_files: Skip .fastresume files that cannot be read successfully.
         :type skip_bad_files: bool
         """
-        archive = None  # Place to store potential backup archive file obj
         if not os.path.exists(self.bt_backup_path) or not os.path.isdir(self.bt_backup_path):
             raise NotADirectoryError(self.bt_backup_path)
         if create_backup:
             backup_filename = f'fastresume_backup{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
-            if os.path.isfile('/.dockerenv') and self.bt_backup_path == '/tmp/BT_backup':
-                backup_path = self.bt_backup_path
-            else:
-                backup_path = os.path.dirname(self.bt_backup_path)
-            archive = zipfile.ZipFile(os.path.join(backup_path, backup_filename), 'w')
+            backup_folder(self.bt_backup_path, os.path.join(self.bt_backup_path, backup_filename))
 
         self.logger.info(f'Searching for .fastresume files with path {existing_path} ...')
         for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path, not skip_bad_files):
-            if archive:
-                archive.write(fast_resume.file_path)
             # Fire and forget
             Thread(target=fast_resume.replace_paths, args=[existing_path, new_path,
                                                            target_os, True, False]).start()
-        if archive:
-            archive.close()
 
     @classmethod
     def discover_relevant_fast_resume(cls, bt_backup_path: str, existing_path: str, raise_on_error: bool = True):
