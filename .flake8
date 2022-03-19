@@ -1,3 +1,5 @@
 [flake8]
-exclude = venv
+exclude =
+    venv
+    build
 max-line-length = 120
