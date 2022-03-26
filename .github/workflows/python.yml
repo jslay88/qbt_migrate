@@ -29,6 +29,12 @@ jobs:
         with:
           python-version: 3.9
 
+      - name: Install Tox
+        if: steps.filter.outputs.python == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          ppp install tox
+
       - name: Run Tox
         if: steps.filter.outputs.python == 'true'
         run: |
