@@ -29,11 +29,11 @@ jobs:
         with:
           python-version: 3.9
 
-      - name: Install Tox
+      - name: Install Tox & Coverage
         if: steps.filter.outputs.python == 'true'
         run: |
           python -m pip install --upgrade pip
-          pip install tox
+          pip install tox coverage
 
       - name: Run Tox
         if: steps.filter.outputs.python == 'true'
