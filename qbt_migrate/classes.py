@@ -22,7 +22,7 @@ class QBTBatchMove(object):
             bt_backup_path = discover_bt_backup_path()
         self.logger.debug(f"BT_backup Path: {bt_backup_path}")
         self.bt_backup_path = bt_backup_path
-        self.discovered_files = None
+        self.discovered_files = set()
 
     def run(
         self,
@@ -54,6 +54,7 @@ class QBTBatchMove(object):
         self.logger.info(f"Searching for .fastresume files with path {existing_path} ...")
         for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path, not skip_bad_files):
             # Fire and forget
+            self.discovered_files.add(fast_resume)
             Thread(target=fast_resume.replace_paths, args=[existing_path, new_path, target_os, True, False]).start()
 
     @classmethod
@@ -97,6 +98,8 @@ class QBTBatchMove(object):
         save_file: bool = True,
         create_backup: bool = True,
     ):
+        if not isinstance(fast_resume, FastResume):
+            raise TypeError("Not a FastResume object, cannot replace paths!")
         fast_resume.replace_paths(existing_path, new_path, target_os, save_file, create_backup)
 
 
@@ -155,7 +158,7 @@ class FastResume(object):
 
     def set_save_paths(
         self,
-        path: Optional[str],
+        path: str,
         qbt_path: Optional[str] = None,
         target_os: Optional[str] = None,
         save_file: bool = True,
@@ -163,8 +166,9 @@ class FastResume(object):
     ):
         if create_backup:
             self.save(self.backup_filename)
-        if path:
-            self.set_save_path(path, key="save_path", target_os=target_os, save_file=False, create_backup=False)
+        if not path.strip():
+            raise ValueError("Cannot set empty paths!")
+        self.set_save_path(path, key="save_path", target_os=target_os, save_file=False, create_backup=False)
         qbt_path = path if qbt_path is None else qbt_path
         if qbt_path:
             self.set_save_path(qbt_path, key="qBt-savePath", target_os=target_os, save_file=False, create_backup=False)
@@ -193,6 +197,8 @@ class FastResume(object):
         new_qbt_save_path = (
             self.qbt_save_path.replace(existing_path, new_path) if self.qbt_save_path is not None else None
         )
+        if self.mapped_files:
+            self._data["mapped_files"] = [path.replace(existing_path, new_path) for path in self.mapped_files]
         self.logger.debug(
             f"Existing Save Path: {existing_path}, New Save Path: {new_path}, " f"Replaced Save Path: {new_save_path}"
         )
