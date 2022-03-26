@@ -39,7 +39,7 @@ jobs:
         run: coverage xml
 
       - name: Store Test Coverage
-        if: strps.filter.outputs.python == 'true' && matrix.toxenv == 'unittest'
+        if: steps.filter.outputs.python == 'true' && matrix.toxenv == 'unittest'
         uses: actions/upload-artifact@v2.2.4
         with:
           name: coverage
