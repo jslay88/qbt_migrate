@@ -29,20 +29,16 @@ jobs:
         with:
           python-version: 3.9
 
-      - name: Install Tox & Coverage
+      - name: Install Tox
         if: steps.filter.outputs.python == 'true'
         run: |
           python -m pip install --upgrade pip
-          pip install tox coverage
+          pip install tox
 
       - name: Run Tox
         if: steps.filter.outputs.python == 'true'
         run: |
           tox -e ${{ matrix.toxenv }}
-
-      - name: Generate Test Coverage
-        if: steps.filter.outputs.python == 'true'
-        run: coverage xml
 
       - name: Store Test Coverage
         if: steps.filter.outputs.python == 'true' && matrix.toxenv == 'unittest'
