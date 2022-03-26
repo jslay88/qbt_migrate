@@ -7,12 +7,12 @@ It can also convert slashes when migrating between Windows and Linux/Mac.
 Install from PyPi using `pip`, or jump to [Examples](#Examples) for Docker
 
     pip install qbt-migrate
-    
+
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
     usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-t {Windows,Linux,Mac}]
               [-b BT_BACKUP_PATH] [-l {DEBUG,INFO}]
-    
+
     optional arguments:
       -h, --help            show this help message and exit
       -e EXISTING_PATH, --existing-path EXISTING_PATH
@@ -22,26 +22,26 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
       -t {Windows,Linux,Mac}, --target-os {Windows,Linux,Mac}
                             Target OS (converts slashes). Default will auto-detect if conversion is needed based on existing vs new.
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
-                            BT_Backup Path Override. 
+                            BT_Backup Path Override.
       -s, --skip-bad-files  Skips bad .fastresume files instead of exiting. Default behavior is to exit.
       -l {DEBUG,INFO}, --log-level {DEBUG,INFO}
                             Log Level, Default is INFO.
 
 By default, everything happens in the BT_Backup directory defined by the OS the script is running on.
-Override `BT_Backup` path if needed.
+Override `BT_backup` path if needed.
 
 Default BT_Backup paths:
 * Windows: `%LOCALAPPDATA%/qBittorrent/BT_backup`
 * Linux/Mac: `$HOME/.local/share/data/qBittorrent/BT_backup`
 
-A backup zip archive is automatically created in the `BT_backup` directory. 
+A backup zip archive is automatically created in the `BT_backup` directory.
 
 ### Examples
 Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `/torrents` when coming from Linux/Mac
 
 **NOTE:** When running `qbt_migrate` on a Linux/Mac machine, Windows paths will require double `\`. Ex. `C:\\Users\\user\\Downloads\\Torrents`
 
-**NOTE:** Take note of trailing slash replacement when changing from Windows <-> Linux. `-e X:\ -n /torrents` will result in `/torrentsxxxxx`, not `/torrents/xxxxx`. 
+**NOTE:** Take note of trailing slash replacement when changing from Windows <-> Linux. `-e X:\ -n /torrents` will result in `/torrentsxxxxx`, not `/torrents/xxxxx`.
 The correct pattern for this would be `-e X: -n /torrents` or `-e X:\ -n /torrents/`.
 
     qbt_migrate -e X:\ -n Z:\ -t Windows  # Windows to Windows (Drive letter change)
@@ -50,7 +50,7 @@ The correct pattern for this would be `-e X: -n /torrents` or `-e X:\ -n /torren
     qbt_migrate -e X: -n /torrents -t Linux  # Windows to Linux/Mac (converts slashes)  # When running on Linux machine \\ is needed for Windows Paths  # Note Trailing Slash
     qbt_migrate -e X:\Torrents -n /torrents -t Linux  # Windows to Linux/Mac (converts slashes)  # When running on Linux machine \\ is needed for Windows Paths
     qbt_migrate -e X:\\Torrents -n /torrents -t Linux  # Windows to Linux/Mac (converts slashes)  # When running on Linux machine \\ is needed for Windows Paths
-    
+
     qbt_migrate -e /torrents -n /new/path/for/torrents  # Changes torrent root path on Linux/Mac
     qbt_migrate -e /torrents -n Z:\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)
     qbt_migrate -e /torrents -n Z:\\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)  # When running on Linux machine \\ is needed for Windows Paths
@@ -75,8 +75,8 @@ Mounting in the default BT_Backup path on a Linux/Mac machine running Docker
     docker run -v $HOME/.local/share/data/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows  # Windows to Windows (Directory Change)
     ...
 
-If for some reason you wanted to override BT_Backup path from `/tmp/BT_Backup` within the container, simply set 
-environment variable `BT_BACKUP_PATH` on the container to where you will be mounting in. 
+If for some reason you wanted to override BT_Backup path from `/tmp/BT_Backup` within the container, simply set
+environment variable `BT_BACKUP_PATH` on the container to where you will be mounting in.
 
 **The `-e` for environment variable override must go before the image `jslay88/qbt_migrate` as the `-e` after the image is for `--existing-path`**
 
@@ -91,7 +91,7 @@ You can also clone this repository, build the image, and run your own built imag
 
 
 ## Python Module
-This project has also been built to be modular and used as a Python Module. If you feel like utilizing this project within your own, 
+This project has also been built to be modular and used as a Python Module. If you feel like utilizing this project within your own,
 please feel free to do so, and let me know!
 
 Use Cases:
