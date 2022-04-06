@@ -1,4 +1,6 @@
 # qBt Migrate
+![Python](https://github.com/jslay88/qbt_migrate/actions/workflows/python.yml/badge.svg)
+
 This tool changes the root paths of existing torrents in qBittorrent.
 It can also convert slashes when migrating between Windows and Linux/Mac.
 
