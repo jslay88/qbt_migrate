@@ -36,7 +36,7 @@ jobs:
           # Change all uppercase to lowercase
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
           # Extract PR Number if PR
-          [[ "${{ github.ref }}" == "refs/pull/"* ]] && VERSION=$(echo "${{ github.ref }}" | sed - 's,refs/pull/\(.*\)/merge,pr-\1,')
+          [[ "${{ github.ref }}" == "refs/pull/"* ]] && VERSION=$(echo "${{ github.ref }}" | sed -e 's,refs/pull/\(.*\)/merge,pr-\1,')
           # Strip git ref prefix from version
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
           # Strip "v" prefix from tag name
