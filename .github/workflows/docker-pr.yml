@@ -5,7 +5,7 @@ on:
 
 jobs:
   push:
-    if: ${{ contains(github.event.pull_request.labels.*.names, 'pr-docker-build') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'pr-docker-build') }}
     runs-on: ubuntu-latest
     permissions:
       packages: write
