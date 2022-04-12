@@ -20,5 +20,5 @@ setup(
     author="jslay88",
     url="https://github.com/jslay88/qbt_migrate",
     entry_points={"console_scripts": ["qbt_migrate = qbt_migrate.cli:main"]},
-    python_requires=">=3.6.4",
+    python_requires=">=3.8",
 )
