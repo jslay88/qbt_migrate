@@ -15,11 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: debug
-        run: |
-          echo "${{ toJson(github) }}"
-          echo "${{ toJson(github.event.pull_request) }}"
-
       - name: Build Docker Image
         run: docker build . --file Dockerfile --tag $(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,') --label "runnumber=${GITHUB_RUN_ID}" --label "gitsha=${{ github.sha }}"
 
@@ -33,7 +28,7 @@ jobs:
           # Change all uppercase to lowercase
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
           # Lowercase branch name
-          VERSION=$(echo "${{ github.ref_name }}" | tr '[A-Z]' '[a-z]')
+          VERSION=$(echo "${{ github.head_ref }}" | tr '[A-Z]' '[a-z]' | sed -e 's,.*/\(.*\),\1,')
           echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
           docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
