@@ -12,6 +12,13 @@ def parse_args():
     parser.add_argument("-e", "--existing-path", help="Existing root of path to look for.")
     parser.add_argument("-n", "--new-path", help="New root path to replace existing root path with.")
     parser.add_argument(
+        "-r",
+        "--regex",
+        help="Existing and New paths are regex patterns with capture groups.",
+        action="store_true",
+        default=None,
+    )
+    parser.add_argument(
         "-t",
         "--target-os",
         help="Target OS (converts slashes). "
@@ -54,6 +61,16 @@ def main():
         args.existing_path = input("Existing Path: ")
     if args.new_path is None:
         args.new_path = input("New Path: ")
+    if args.regex is None:
+        while (answer := input("Regex Paths with Capture Groups [y/N]: ").lower().strip()) not in [
+            "y",
+            "n",
+            "yes",
+            "no",
+            "",
+        ]:
+            print("Please answer y, n, yes, or no")
+        args.regex = answer.lower().strip() in ["y", "yes"]
     if args.target_os is None:
         args.target_os = input("Target OS (Windows, Linux, Mac, Blank for auto-detect): ")
     if args.target_os.strip() and args.target_os.strip().lower() not in ("windows", "linux", "mac"):
@@ -71,7 +88,8 @@ def main():
         f"Existing Path: {args.existing_path}, New Path: {args.new_path}, "
         f"Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}"
     )
-    qbm.run(args.existing_path, args.new_path, args.target_os, True, args.skip_bad_files)
+    print(args.regex)
+    qbm.run(args.existing_path, args.new_path, args.regex, args.target_os, True, args.skip_bad_files)
 
 
 if __name__ == "__main__":
