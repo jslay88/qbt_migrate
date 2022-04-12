@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: debug
+        run: |
+          echo "${{ toJson(github) }}"
+          echo "${{ toJson(github.event.pull_request) }}"
+
       - name: Build Docker Image
         run: docker build . --file Dockerfile --tag $(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,') --label "runnumber=${GITHUB_RUN_ID}" --label "gitsha=${{ github.sha }}"
 
