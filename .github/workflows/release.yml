@@ -1,0 +1,75 @@
+name: Package and Release
+# Build Python package for PyPi and GitGub release, and then publish a GitHub Release
+# Runs on semantic versioned tags only
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build Python Package
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v2.2.2
+        with:
+          python-version: 3.9
+
+      - name: Install Tox
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox
+
+      - name: Build Python Package via Tox
+        run: |
+          tox -e build
+
+      - name: Store Python Package as Artifact
+        uses: actions/upload-artifact@v2.2.4
+        with:
+          name: dist
+          path: dist/
+
+  upload:
+    runs-on: ubuntu-latest
+    name: Upload Package and Create Release
+    permissions:
+      contents: write
+    needs:
+      - build
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v2.2.2
+        with:
+          python-version: 3.9
+
+      - name: Install Twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Retreive Python Package Artifact
+        uses: actions/download-artifact@v2.0.10
+        with:
+          name: dist
+          path: dist
+
+      - name: Upload Package to PyPi
+        run: |
+          twine upload -u "__token__" -p "${{ secrets.PYPI_TOKEN }}" dist/*
+
+      - name: Create GitHub Release with Python Package
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*

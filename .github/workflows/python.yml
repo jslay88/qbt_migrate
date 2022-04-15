@@ -1,9 +1,12 @@
-name: python
+name: Python Checks
+# Python checks (usually tox matrix) to ensure code quality for PRs and merging
+# Runs on pull requests
 
 on: pull_request
 
 jobs:
   tox:
+    name: Tox Matrix
     runs-on: ubuntu-latest
 
     strategy:
@@ -11,9 +14,10 @@ jobs:
         toxenv:
           - lint
           - unittest
+          - build
 
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v3
       - uses: dorny/paths-filter@v2.10.2
         id: filter
         with:
@@ -49,11 +53,12 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
+    name: Coverage
     needs:
       - tox
 
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - uses: dorny/paths-filter@v2.10.2

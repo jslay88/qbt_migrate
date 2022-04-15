@@ -27,7 +27,7 @@ def parse_args():
         choices=["Windows", "Linux", "Mac"],
     )
     parser.add_argument(
-        "-b", "--bt-backup-path", help="BT_Backup Path Override. " f"Default is {discover_bt_backup_path()}"
+        "-b", "--bt-backup-path", help="BT_backup Path Override. " f"Default is {discover_bt_backup_path()}"
     )
     parser.add_argument(
         "-s",
@@ -54,7 +54,7 @@ def main():
     if args.bt_backup_path is not None:
         qbm.bt_backup_path = args.bt_backup_path
     else:
-        bt_backup_path = input(f"BT_Backup Path {qbm.bt_backup_path}: ")
+        bt_backup_path = input(f"BT_backup Path {qbm.bt_backup_path}: ")
         if bt_backup_path.strip():
             qbm.bt_backup_path = bt_backup_path
     if args.existing_path is None:
