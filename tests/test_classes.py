@@ -268,6 +268,12 @@ def test_fastresume_set_save_paths(monkeypatch):
     for mapped_file in fast_resume.mapped_files:
         assert mapped_file.startswith("\\some\\test\\path\\")
 
+    # Test missing qBt-savePath key
+    del fast_resume._data["qBt-savePath"]
+    fast_resume.set_save_paths("/this/is/a/path")
+    assert fast_resume.save_path == "/this/is/a/path"
+    assert fast_resume.qbt_save_path == "/this/is/a/path"
+
 
 def test_fastresume_save(monkeypatch):
     fast_resume = FastResume("./tests/test_files/good.fastresume")

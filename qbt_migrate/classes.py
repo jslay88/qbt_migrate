@@ -168,7 +168,7 @@ class FastResume(object):
             self.save(self.backup_filename)
         if target_os is not None:
             path = convert_slashes(path, target_os)
-        self.logger.debug(f"Setting {key}... Old: {self._data[key]}, New: {path}, Target OS: {target_os}")
+        self.logger.debug(f"Setting {key}... Old: {self._data.get(key, None)}, New: {path}, Target OS: {target_os}")
         self._data[key] = path
         if save_file:
             self.save()
