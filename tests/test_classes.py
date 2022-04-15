@@ -5,6 +5,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import pytest
 from bencodepy.exceptions import BencodeDecodeError
@@ -29,10 +30,8 @@ def temp_dir():
 
 @pytest.fixture
 def temp_file(mode="w"):
-    temp_file = tempfile.mktemp()
-    with open(temp_file, mode) as f:
-        yield temp_file, f
-    os.remove(temp_file)
+    with NamedTemporaryFile(mode, delete=False) as f:
+        yield f.name, f
 
 
 @pytest.mark.parametrize(
