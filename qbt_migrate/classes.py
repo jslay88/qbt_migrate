@@ -40,7 +40,7 @@ class QBTBatchMove(object):
         :type new_path: str
         :param target_os: If targeting a different OS than the source. Must be Windows, Linux, or Mac.
         :type target_os: str
-        :param create_backup: Create a backup archive of the BT_Backup directory?
+        :param create_backup: Create a backup archive of the BT_backup directory?
         :type create_backup: bool
         :param skip_bad_files: Skip .fastresume files that cannot be read successfully.
         :type skip_bad_files: bool

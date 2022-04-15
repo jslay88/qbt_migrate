@@ -24,15 +24,15 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
       -t {Windows,Linux,Mac}, --target-os {Windows,Linux,Mac}
                             Target OS (converts slashes). Default will auto-detect if conversion is needed based on existing vs new.
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
-                            BT_Backup Path Override.
+                            BT_backup Path Override.
       -s, --skip-bad-files  Skips bad .fastresume files instead of exiting. Default behavior is to exit.
       -l {DEBUG,INFO}, --log-level {DEBUG,INFO}
                             Log Level, Default is INFO.
 
-By default, everything happens in the BT_Backup directory defined by the OS the script is running on.
+By default, everything happens in the BT_backup directory defined by the OS the script is running on.
 Override `BT_backup` path if needed.
 
-Default BT_Backup paths:
+Default BT_backup paths:
 * Windows: `%LOCALAPPDATA%/qBittorrent/BT_backup`
 * Linux/Mac: `$HOME/.local/share/data/qBittorrent/BT_backup`
 
@@ -59,25 +59,25 @@ The correct pattern for this would be `-e X: -n /torrents` or `-e X:\ -n /torren
 
 #### Docker
 You can also run this tool with Docker if you don't have Python, or don't want to install the package to your system directly.
-The BT_Backup path is automatically overridden to `/tmp/BT_Backup`, so mount your `BT_Backup` there.
+The BT_backup path is automatically overridden to `/tmp/BT_backup`, so mount your `BT_backup` there.
 
 **NOTE:** When running `qbt_migrate` Docker image on a Linux/Mac machine, Windows paths will require double `\`. Ex. `C:\\Users\\user\\Downloads\\Torrents`
 
 **The Docker image has all functionality as the pip install, following the same arguments/patterns listed in the above examples.**
 
-For example, mounting in the default BT_Backup path on a Windows machine running Docker
+For example, mounting in the default BT_backup path on a Windows machine running Docker
 
     docker run -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\ -n Z:\  # Windows to Windows (Drive letter change)
     docker run -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows  # Windows to Windows (Directory Change)
     ...
 
-Mounting in the default BT_Backup path on a Linux/Mac machine running Docker
+Mounting in the default BT_backup path on a Linux/Mac machine running Docker
 
     docker run -v $HOME/.local/share/data/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\ -n Z:\  # Windows to Windows (Drive letter change)
     docker run -v $HOME/.local/share/data/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows  # Windows to Windows (Directory Change)
     ...
 
-If for some reason you wanted to override BT_Backup path from `/tmp/BT_Backup` within the container, simply set
+If for some reason you wanted to override BT_backup path from `/tmp/BT_backup` within the container, simply set
 environment variable `BT_BACKUP_PATH` on the container to where you will be mounting in.
 
 **The `-e` for environment variable override must go before the image `jslay88/qbt_migrate` as the `-e` after the image is for `--existing-path`**
@@ -88,7 +88,7 @@ environment variable `BT_BACKUP_PATH` on the container to where you will be moun
 You can also clone this repository, build the image, and run your own built image
 
     docker build . -t qbt_migrate
-    docker run -v %LOCALAPPDATA%/qBittorrent/BT_Backup:/tmp/BT_backup qbt_migrate -e X:\ -n Z:\  # Windows to Windows (Drive letter change)
+    docker run -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup qbt_migrate -e X:\ -n Z:\  # Windows to Windows (Drive letter change)
     ...
 
 
