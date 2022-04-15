@@ -23,6 +23,9 @@ jobs:
       - name: GitHub Container Registry Login
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
+      - name: DockerHub Container Registry Login
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
       - name: Push Docker Image
         run: |
           IMAGE_NAME=$(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,')
@@ -39,3 +42,5 @@ jobs:
           echo VERSION=$VERSION
           docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
           docker push $IMAGE_ID:$VERSION
+          docker tag $IMAGE_NAME ${{ github.repository }}:$VERSION
+          docker push ${{ github.repository }}:$VERSION
