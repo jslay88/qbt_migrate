@@ -1,6 +1,10 @@
-name: PyPi Upload
+name: Python Package Upload
 
-on: release
+on:
+  push:
+    tags:
+      - "*.*.*"
+
 
 jobs:
   build:
@@ -55,7 +59,13 @@ jobs:
         uses: actions/download-artifact@v2.0.10
         with:
           name: dist
+          path: dist
 
       - name: Upload package to PyPi
         run: |
           twine upload -u "__token__" -p "${{ secrets.PYPI_TOKEN }}" dist/*
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
