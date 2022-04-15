@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - master
-
-  release:
+    tags:
+      - "*.*.*"
 
 jobs:
   push:
