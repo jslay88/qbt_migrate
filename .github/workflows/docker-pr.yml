@@ -1,4 +1,5 @@
-name: Docker Push - PRs
+# Builds and Pushes Docker image for PRs with label `pr-docker-build` to GHCR only.
+name: Docker Build and Push - PRs
 
 on:
   pull_request:
@@ -21,7 +22,7 @@ jobs:
       - name: GitHub Container Registry Login
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
-      - name: Push Docker Image
+      - name: Push Docker Image to GHCR
         run: |
           IMAGE_NAME=$(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,')
           IMAGE_ID=ghcr.io/${{ github.repository }}
