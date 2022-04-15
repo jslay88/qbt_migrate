@@ -1,4 +1,6 @@
-name: Docker Push
+# Builds and Pushes Docker images for `latest` and semantic versioned tags or "releases".
+# Runs on pushes to master for `latest`, and semantic versioned tags for "releases"
+name: Docker Build and Push
 
 on:
   push:
@@ -9,6 +11,7 @@ on:
 
 jobs:
   push:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -26,7 +29,7 @@ jobs:
       - name: DockerHub Container Registry Login
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
 
-      - name: Push Docker Image
+      - name: Push Docker Image to GHCR and DockerHub
         run: |
           IMAGE_NAME=$(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,')
           IMAGE_ID=ghcr.io/${{ github.repository }}
