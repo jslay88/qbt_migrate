@@ -31,6 +31,8 @@ jobs:
 
   upload:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs:
       - build
 
@@ -57,3 +59,8 @@ jobs:
       - name: Upload package to PyPi
         run: |
           twine upload -u "__token__" -p "${{ secrets.PYPI_TOKEN }}" dist/*
+
+      - name: Upload package to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
