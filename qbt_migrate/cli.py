@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 
 from . import QBTBatchMove, discover_bt_backup_path
 
@@ -7,7 +8,7 @@ from . import QBTBatchMove, discover_bt_backup_path
 logger = logging.getLogger(__name__)
 
 
-def parse_args():
+def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--existing-path", help="Existing root of path to look for.")
     parser.add_argument("-n", "--new-path", help="New root path to replace existing root path with.")
@@ -41,11 +42,11 @@ def parse_args():
         "-l", "--log-level", help="Log Level, Default is INFO.", choices=["DEBUG", "INFO"], default="INFO"
     )
 
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
 def main():
-    args = parse_args()
+    args = parse_args(sys.argv[1:])
     logging.basicConfig()
     logger.setLevel(args.log_level)
     logging.getLogger("qbt_migrate").setLevel(args.log_level)
@@ -61,21 +62,32 @@ def main():
         args.existing_path = input("Existing Path: ")
     if args.new_path is None:
         args.new_path = input("New Path: ")
+
+    # Get Valid Regex Input
     if args.regex is None:
-        while (answer := input("Regex Paths with Capture Groups [y/N]: ").lower().strip()) not in [
+        while (answer := input("Regex Paths with Capture Groups [y/N]: ").lower().strip()) not in (
             "y",
-            "n",
             "yes",
+            "n",
             "no",
             "",
-        ]:
+        ):
             print("Please answer y, n, yes, or no")
         args.regex = answer.lower().strip() in ["y", "yes"]
+
+    # Get Valid Target OS Input
     if args.target_os is None:
-        args.target_os = input("Target OS (Windows, Linux, Mac, Blank for auto-detect): ")
-    if args.target_os.strip() and args.target_os.strip().lower() not in ("windows", "linux", "mac"):
-        raise ValueError(f"Target OS is not valid. Must be Windows, Linux, or Mac. Received:{args.target_os}")
-    elif not args.target_os.strip():
+        while (answer := input("Target OS (Windows, Linux, Mac, Blank for auto-detect): ").lower().strip()) not in (
+            "windows",
+            "linux",
+            "mac",
+            "",
+        ):
+            print("Please answer Windows, Linux, or Mac")
+        args.target_os = answer.lower().strip()
+
+    # Handle Target OS Auto-Detect if not specified
+    if not args.target_os.strip():
         if "/" in args.existing_path and "\\" in args.new_path:
             logger.info("Auto detected target OS change. Will convert slashes to Windows.")
             args.target_os = "windows"
@@ -84,13 +96,13 @@ def main():
             args.target_os = "linux"
         else:
             args.target_os = None
+
     logger.debug(
         f"Existing Path: {args.existing_path}, New Path: {args.new_path}, "
         f"Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}"
     )
-    print(args.regex)
     qbm.run(args.existing_path, args.new_path, args.regex, args.target_os, True, args.skip_bad_files)
 
 
 if __name__ == "__main__":
-    main()
+    main()  # pragma: no cover
