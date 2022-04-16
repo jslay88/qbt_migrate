@@ -12,8 +12,7 @@ Install from PyPi using `pip`, or jump to [Examples](#Examples) for Docker
 
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
-    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-t {Windows,Linux,Mac}]
-              [-b BT_BACKUP_PATH] [-l {DEBUG,INFO}]
+    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-l {DEBUG,INFO}]
 
     optional arguments:
       -h, --help            show this help message and exit
@@ -21,6 +20,7 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
                             Existing root of path to look for.
       -n NEW_PATH, --new-path NEW_PATH
                             New root path to replace existing root path with.
+      -r, --regex           Existing and New paths are regex patterns with capture groups.
       -t {Windows,Linux,Mac}, --target-os {Windows,Linux,Mac}
                             Target OS (converts slashes). Default will auto-detect if conversion is needed based on existing vs new.
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
