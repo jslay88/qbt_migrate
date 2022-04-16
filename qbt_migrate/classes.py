@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from datetime import datetime
 from threading import Thread
 from typing import Optional
@@ -28,6 +29,7 @@ class QBTBatchMove(object):
         self,
         existing_path: str,
         new_path: str,
+        regex_path: bool = False,
         target_os: Optional[str] = None,
         create_backup: bool = True,
         skip_bad_files: bool = False,
@@ -38,6 +40,8 @@ class QBTBatchMove(object):
         :type existing_path: str
         :param new_path: New Path to replace with
         :type new_path: str
+        :param regex_path: Existing and New Paths are regex patterns with capture groups
+        :type regex_path: bool
         :param target_os: If targeting a different OS than the source. Must be Windows, Linux, or Mac.
         :type target_os: str
         :param create_backup: Create a backup archive of the BT_backup directory?
@@ -52,19 +56,27 @@ class QBTBatchMove(object):
             backup_folder(self.bt_backup_path, os.path.join(self.bt_backup_path, backup_filename))
 
         self.logger.info(f"Searching for .fastresume files with path {existing_path} ...")
-        for fast_resume in self.discover_relevant_fast_resume(self.bt_backup_path, existing_path, not skip_bad_files):
+        for fast_resume in self.discover_relevant_fast_resume(
+            self.bt_backup_path, existing_path, regex_path, not skip_bad_files
+        ):
             # Fire and forget
             self.discovered_files.add(fast_resume)
-            Thread(target=fast_resume.replace_paths, args=[existing_path, new_path, target_os, True, False]).start()
+            Thread(
+                target=fast_resume.replace_paths, args=[existing_path, new_path, regex_path, target_os, True, False]
+            ).start()
 
     @classmethod
-    def discover_relevant_fast_resume(cls, bt_backup_path: str, existing_path: str, raise_on_error: bool = True):
+    def discover_relevant_fast_resume(
+        cls, bt_backup_path: str, existing_path: str, regex_path: bool = False, raise_on_error: bool = True
+    ):
         """
         Find .fastresume files that contain the existing path.
         :param bt_backup_path: Path to BT_backup folder
         :type bt_backup_path: str
         :param existing_path: The existing path to look for
         :type existing_path: str
+        :param regex_path: Existing Path is a regex pattern with capture groups
+        :type: bool
         :param raise_on_error: Raise if error parsing .fastresume files
         :type raise_on_error: bool
         :return: List of FastResume Objects
@@ -82,6 +94,10 @@ class QBTBatchMove(object):
                     continue
                 if existing_path in fast_resume.save_path or existing_path in fast_resume.qbt_save_path:
                     yield fast_resume
+                elif regex_path and (
+                    re.match(existing_path, fast_resume.save_path) or re.match(existing_path, fast_resume.qbt_save_path)
+                ):
+                    yield fast_resume
         return
 
     @classmethod
@@ -94,13 +110,14 @@ class QBTBatchMove(object):
         fast_resume: "FastResume",
         existing_path: str,
         new_path: str,
+        regex_path: bool = False,
         target_os: Optional[str] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
         if not isinstance(fast_resume, FastResume):
             raise TypeError("Not a FastResume object, cannot replace paths!")
-        fast_resume.replace_paths(existing_path, new_path, target_os, save_file, create_backup)
+        fast_resume.replace_paths(existing_path, new_path, regex_path, target_os, save_file, create_backup)
 
 
 class FastResume(object):
@@ -188,17 +205,29 @@ class FastResume(object):
         self,
         existing_path: str,
         new_path: str,
+        regex_path: bool = False,
         target_os: Optional[str] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
         self.logger.info(f"Replacing Paths in FastResume {self.file_path}...")
-        new_save_path = self.save_path.replace(existing_path, new_path) if self.save_path is not None else None
-        new_qbt_save_path = (
-            self.qbt_save_path.replace(existing_path, new_path) if self.qbt_save_path is not None else None
-        )
-        if self.mapped_files:
-            self._data["mapped_files"] = [path.replace(existing_path, new_path) for path in self.mapped_files]
+        if regex_path:
+            new_save_path = None
+            new_qbt_save_path = None
+            pattern = re.compile(existing_path)
+            if self.save_path:
+                new_save_path = pattern.sub(new_path, self.save_path)
+            if self.qbt_save_path:
+                new_qbt_save_path = pattern.sub(new_path, self.qbt_save_path)
+            if self.mapped_files:
+                self._data["mapped_files"] = [pattern.sub(new_path, path) for path in self.mapped_files]
+        else:
+            new_save_path = self.save_path.replace(existing_path, new_path) if self.save_path is not None else None
+            new_qbt_save_path = (
+                self.qbt_save_path.replace(existing_path, new_path) if self.qbt_save_path is not None else None
+            )
+            if self.mapped_files:
+                self._data["mapped_files"] = [path.replace(existing_path, new_path) for path in self.mapped_files]
         self.logger.debug(
             f"Existing Save Path: {existing_path}, New Save Path: {new_path}, " f"Replaced Save Path: {new_save_path}"
         )
