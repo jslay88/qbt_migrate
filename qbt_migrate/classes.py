@@ -92,7 +92,9 @@ class QBTBatchMove(object):
                         raise e
                     cls.logger.warning(f"Unable to parse {file}. Skipping!\n\n{e}")
                     continue
-                if existing_path in fast_resume.save_path or existing_path in fast_resume.qbt_save_path:
+                if existing_path in fast_resume.save_path or (
+                    fast_resume.qbt_save_path is not None and existing_path in fast_resume.qbt_save_path
+                ):
                     yield fast_resume
                 elif regex_path and (
                     re.match(existing_path, fast_resume.save_path) or re.match(existing_path, fast_resume.qbt_save_path)

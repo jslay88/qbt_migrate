@@ -53,12 +53,12 @@ def test_qbt_batch_move_discover_relevant_fast_resume(temp_dir):
         print(f"Copying {file} to {temp_dir / file.name}")
         shutil.copy(file, temp_dir / file.name)
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "", False, True))
-    assert len(fast_resume_files) == 2
+    assert len(fast_resume_files) == 3
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "/some/test", False, True))
-    assert len(fast_resume_files) == 1
+    assert len(fast_resume_files) == 2
     assert fast_resume_files[0].save_path.startswith("/some/test") is True
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, r"/some/(\w+)/.*$", True, True))
-    assert len(fast_resume_files) == 1
+    assert len(fast_resume_files) == 2
     assert fast_resume_files[0].save_path.startswith("/some/test") is True
 
     for file in glob.glob("./tests/test_files/bad*.fastresume"):
@@ -69,7 +69,7 @@ def test_qbt_batch_move_discover_relevant_fast_resume(temp_dir):
         list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "/some/test", False, True))
 
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "/some/test", False, False))
-    assert len(fast_resume_files) == 1
+    assert len(fast_resume_files) == 2
 
 
 def test_qbt_batch_move_run_not_a_dir(temp_file):
@@ -168,7 +168,8 @@ def test_fastresume_properties(temp_dir):
         assert fast_resume.backup_filename.startswith(str(temp_dir / file.name))
         assert fast_resume.backup_filename.endswith(".bkup")
         assert fast_resume.save_path == fast_resume._data["save_path"]
-        assert fast_resume.qbt_save_path == fast_resume._data["qBt-savePath"]
+        if "qBt-savePath" in fast_resume._data:
+            assert fast_resume.qbt_save_path == fast_resume._data["qBt-savePath"]
         assert (
             fast_resume.mapped_files == fast_resume._data["mapped_files"]
             if "mapped_files" in fast_resume._data
