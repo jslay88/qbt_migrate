@@ -53,12 +53,12 @@ def test_qbt_batch_move_discover_relevant_fast_resume(temp_dir):
         print(f"Copying {file} to {temp_dir / file.name}")
         shutil.copy(file, temp_dir / file.name)
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "", False, True))
-    assert len(fast_resume_files) == 3
+    assert len(fast_resume_files) == 4
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "/some/test", False, True))
-    assert len(fast_resume_files) == 2
+    assert len(fast_resume_files) == 3
     assert fast_resume_files[0].save_path.startswith("/some/test") is True
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, r"/some/(\w+)/.*$", True, True))
-    assert len(fast_resume_files) == 2
+    assert len(fast_resume_files) == 3
     assert fast_resume_files[0].save_path.startswith("/some/test") is True
 
     for file in glob.glob("./tests/test_files/bad*.fastresume"):
@@ -69,7 +69,7 @@ def test_qbt_batch_move_discover_relevant_fast_resume(temp_dir):
         list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "/some/test", False, True))
 
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "/some/test", False, False))
-    assert len(fast_resume_files) == 2
+    assert len(fast_resume_files) == 3
 
 
 def test_qbt_batch_move_run_not_a_dir(temp_file):
@@ -152,7 +152,7 @@ def test_fastresume_init(temp_dir):
         print(f"Copying {file} to {temp_dir / file.name}")
         shutil.copy(file, temp_dir / file.name)
         fast_resume = FastResume(temp_dir / file.name)
-        assert fast_resume.save_path is not None
+        assert fast_resume.save_path is not None or fast_resume.qbt_save_path is not None
 
     with pytest.raises(FileNotFoundError):
         FastResume("/not/a/valid/file")
@@ -167,7 +167,8 @@ def test_fastresume_properties(temp_dir):
         assert fast_resume.file_path == str(temp_dir / file.name)
         assert fast_resume.backup_filename.startswith(str(temp_dir / file.name))
         assert fast_resume.backup_filename.endswith(".bkup")
-        assert fast_resume.save_path == fast_resume._data["save_path"]
+        if "save_path" in fast_resume._data:
+            assert fast_resume.save_path == fast_resume._data["save_path"]
         if "qBt-savePath" in fast_resume._data:
             assert fast_resume.qbt_save_path == fast_resume._data["qBt-savePath"]
         assert (
@@ -308,6 +309,42 @@ def test_fastresume_replace_paths(monkeypatch):
 
 def test_fastresume_replace_paths_regex(monkeypatch):
     fast_resume = FastResume("./tests/test_files/good.fastresume")
+    fast_resume.replace_paths(r"/some/(\w+)/.*$", r"/\1/regex", True, save_file=False, create_backup=False)
+    assert fast_resume.save_path == "/test/regex"
+    assert fast_resume.qbt_save_path == "/test/regex"
+    assert len(fast_resume.mapped_files) > 0
+    for mapped_file in fast_resume.mapped_files:
+        assert mapped_file.startswith("/test/regex")
+
+
+def test_fastresume_replace_paths_missing_save_path():
+    fast_resume = FastResume("./tests/test_files/good_no_save_path.fastresume")
+    fast_resume.replace_paths("/some/test", "/a/new/test", save_file=False, create_backup=False)
+    assert fast_resume.save_path == "/a/new/test/path"
+    assert fast_resume.qbt_save_path == "/a/new/test/path"
+    assert len(fast_resume.mapped_files) > 0
+    for mapped_file in fast_resume.mapped_files:
+        assert mapped_file.startswith("/a/new/test/path")
+
+    fast_resume = FastResume("./tests/test_files/good_no_save_path.fastresume")
+    fast_resume.replace_paths(r"/some/(\w+)/.*$", r"/\1/regex", True, save_file=False, create_backup=False)
+    assert fast_resume.save_path == "/test/regex"
+    assert fast_resume.qbt_save_path == "/test/regex"
+    assert len(fast_resume.mapped_files) > 0
+    for mapped_file in fast_resume.mapped_files:
+        assert mapped_file.startswith("/test/regex")
+
+
+def test_fastresume_replace_paths_missing_qbt_save_path():
+    fast_resume = FastResume("./tests/test_files/good_no_qbt_save_path.fastresume")
+    fast_resume.replace_paths("/some/test", "/a/new/test", save_file=False, create_backup=False)
+    assert fast_resume.save_path == "/a/new/test/path"
+    assert fast_resume.qbt_save_path == "/a/new/test/path"
+    assert len(fast_resume.mapped_files) > 0
+    for mapped_file in fast_resume.mapped_files:
+        assert mapped_file.startswith("/a/new/test/path")
+
+    fast_resume = FastResume("./tests/test_files/good_no_qbt_save_path.fastresume")
     fast_resume.replace_paths(r"/some/(\w+)/.*$", r"/\1/regex", True, save_file=False, create_backup=False)
     assert fast_resume.save_path == "/test/regex"
     assert fast_resume.qbt_save_path == "/test/regex"

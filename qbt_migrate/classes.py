@@ -92,12 +92,13 @@ class QBTBatchMove(object):
                         raise e
                     cls.logger.warning(f"Unable to parse {file}. Skipping!\n\n{e}")
                     continue
-                if existing_path in fast_resume.save_path or (
+                if (fast_resume.save_path is not None and existing_path in fast_resume.save_path) or (
                     fast_resume.qbt_save_path is not None and existing_path in fast_resume.qbt_save_path
                 ):
                     yield fast_resume
                 elif regex_path and (
-                    re.match(existing_path, fast_resume.save_path) or re.match(existing_path, fast_resume.qbt_save_path)
+                    (fast_resume.save_path is not None and re.match(existing_path, fast_resume.save_path))
+                    or (fast_resume.qbt_save_path is not None and re.match(existing_path, fast_resume.qbt_save_path))
                 ):
                     yield fast_resume
         return
@@ -221,6 +222,8 @@ class FastResume(object):
                 new_save_path = pattern.sub(new_path, self.save_path)
             if self.qbt_save_path:
                 new_qbt_save_path = pattern.sub(new_path, self.qbt_save_path)
+                if not self.save_path:
+                    new_save_path = new_qbt_save_path
             if self.mapped_files:
                 self._data["mapped_files"] = [pattern.sub(new_path, path) for path in self.mapped_files]
         else:
@@ -228,6 +231,8 @@ class FastResume(object):
             new_qbt_save_path = (
                 self.qbt_save_path.replace(existing_path, new_path) if self.qbt_save_path is not None else None
             )
+            if not self.save_path:
+                new_save_path = new_qbt_save_path
             if self.mapped_files:
                 self._data["mapped_files"] = [path.replace(existing_path, new_path) for path in self.mapped_files]
         self.logger.debug(
