@@ -56,10 +56,20 @@ def test_qbt_batch_move_discover_relevant_fast_resume(temp_dir):
     assert len(fast_resume_files) == 4
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "/some/test", False, True))
     assert len(fast_resume_files) == 3
-    assert fast_resume_files[0].save_path.startswith("/some/test") is True
+    for fr in fast_resume_files:
+        if fr.save_path:
+            assert fr.save_path.startswith("/some/test") is True
+            break
+    else:
+        raise FileNotFoundError("No fastresume found that has a save_path key! Cannot maintain test integrity!")
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, r"/some/(\w+)/.*$", True, True))
     assert len(fast_resume_files) == 3
-    assert fast_resume_files[0].save_path.startswith("/some/test") is True
+    for fr in fast_resume_files:
+        if fr.qbt_save_path:
+            assert fast_resume_files[0].save_path.startswith("/some/test") is True
+            break
+    else:
+        raise FileNotFoundError("No fastresume found that has a qbt_save_path key! Cannot maintain test integrity!")
 
     for file in glob.glob("./tests/test_files/bad*.fastresume"):
         file = Path(file)
