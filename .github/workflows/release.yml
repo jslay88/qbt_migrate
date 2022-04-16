@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Build Python Package
+    name: Build, Upload, and Release
 
     steps:
       - uses: actions/checkout@v3
@@ -21,53 +21,19 @@ jobs:
         with:
           python-version: 3.9
 
-      - name: Install Tox
+      - name: Install Flit
         run: |
           python -m pip install --upgrade pip
-          pip install tox
+          pip install flit
 
-      - name: Build Python Package via Tox
+      - name: Build Python Package and Upload to PyPi
+        env:
+          FLIT_USERNAME: __token__
+          FLIT_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          FLIT_INDEX_URL: https://upload.pypi.org/legacy/
         run: |
-          tox -e build
-
-      - name: Store Python Package as Artifact
-        uses: actions/upload-artifact@v2.2.4
-        with:
-          name: dist
-          path: dist/
-
-  upload:
-    runs-on: ubuntu-latest
-    name: Upload Package and Create Release
-    permissions:
-      contents: write
-    needs:
-      - build
-
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Setup Python
-        uses: actions/setup-python@v2.2.2
-        with:
-          python-version: 3.9
-
-      - name: Install Twine
-        run: |
-          python -m pip install --upgrade pip
-          pip install twine
-
-      - name: Retreive Python Package Artifact
-        uses: actions/download-artifact@v2.0.10
-        with:
-          name: dist
-          path: dist
-
-      - name: Upload Package to PyPi
-        run: |
-          twine upload -u "__token__" -p "${{ secrets.PYPI_TOKEN }}" dist/*
+          flit install --symlink --deps production
+          flit publish
 
       - name: Create GitHub Release with Python Package
         uses: softprops/action-gh-release@v1
