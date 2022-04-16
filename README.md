@@ -8,7 +8,9 @@ It can also convert slashes when migrating between Windows and Linux/Mac.
 
 Install from PyPi using `pip`, or jump to [Examples](#Examples) for Docker
 
-    pip install qbt-migrate
+**NOTE:** Versions prior to `2.2.0` were released under `qbt-migrate`
+
+    pip install qbt_migrate
 
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 

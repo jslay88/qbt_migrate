@@ -14,7 +14,6 @@ jobs:
         toxenv:
           - lint
           - unittest
-          - build
 
     steps:
       - uses: actions/checkout@v3
@@ -24,7 +23,6 @@ jobs:
           filters: |
             python:
               - '**.py'
-              - 'requirements.txt'
               - 'tox.ini'
 
       - name: Set up Python
@@ -67,7 +65,6 @@ jobs:
           filters: |
             python:
               - '**.py'
-              - 'requirements.txt'
               - 'tox.ini'
 
       - name: Setup Python
@@ -93,3 +90,46 @@ jobs:
         if: steps.filter.outputs.python == 'true'
         run: |
           diff-cover coverage/coverage.xml --compare-branch=origin/master --fail-under=100
+
+  build:
+    runs-on: ubuntu-latest
+    name: Build Python Package and Upload to TestPyPi
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2.10.2
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**.py'
+              - 'pyproject.toml'
+
+      - name: Set up Python
+        uses: actions/setup-python@v2.2.2
+        if: steps.filter.outputs.python == 'true'
+        with:
+          python-version: 3.9
+
+      - name: Install Flit
+        if: steps.filter.outputs.python == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install flit
+
+      - name: Build Python Package and Upload to TestPyPi
+        if: steps.filter.outputs.python == 'true'
+        env:
+          FLIT_USERNAME: __token__
+          FLIT_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
+          FLIT_INDEX_URL: https://test.pypi.org/legacy/
+        run: |
+          flit install --symlink --deps production
+          export VERSION_TAG=dev${GITHUB_RUN_ID}; flit publish
+
+      - name: Store Python Package as Artifact
+        uses: actions/upload-artifact@v2.2.4
+        if: steps.filter.outputs.python == 'true'
+        with:
+          name: dist
+          path: dist/
