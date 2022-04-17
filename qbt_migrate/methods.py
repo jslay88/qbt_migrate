@@ -45,4 +45,4 @@ def discover_bt_backup_path():
         return "/config/qBittorrent/BT_backup"
 
     logger.debug("Linux/Mac System")
-    return os.path.join(os.getenv("HOME", "/home"), ".local/share/data/qBittorrent/BT_backup")
+    return os.path.join(os.getenv("HOME"), ".local/share/data/qBittorrent/BT_backup")
