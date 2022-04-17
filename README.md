@@ -57,6 +57,11 @@ The correct pattern for this would be `-e X: -n /torrents` or `-e X:\ -n /torren
     qbt_migrate -e /torrents -n Z:\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)
     qbt_migrate -e /torrents -n Z:\\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)  # When running on Linux machine \\ is needed for Windows Paths
 
+    # Adavanced Usage with RegEx
+    # Example would replace /some/test/with/a/path with /test/matched/path
+    qbt_migrate -r -e /some/(\w+)/.*$ -n \1/path -t Linux  # Matches using regex patterns and replaces using capture groups.
+    qbt_migrate --regex -e /some/(\w+)/.*$ -n \1/matched/path -t Linux  # Matches using regex patterns and replaces using capture groups.
+
 #### Docker
 You can also run this tool with Docker if you don't have Python, or don't want to install the package to your system directly.
 The BT_backup path is automatically overridden to `/tmp/BT_backup`, so mount your `BT_backup` there.
