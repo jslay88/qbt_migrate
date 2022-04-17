@@ -59,7 +59,7 @@ The correct pattern for this would be `-e X: -n /torrents` or `-e X:\ -n /torren
 
     # Adavanced Usage with RegEx
     # Example would replace /some/test/with/a/path with /test/matched/path
-    qbt_migrate -r -e /some/(\w+)/.*$ -n \1/path -t Linux  # Matches using regex patterns and replaces using capture groups.
+    qbt_migrate -r -e /some/(\w+)/.*$ -n \1/matched/path -t Linux  # Matches using regex patterns and replaces using capture groups.
     qbt_migrate --regex -e /some/(\w+)/.*$ -n \1/matched/path -t Linux  # Matches using regex patterns and replaces using capture groups.
 
 #### Docker
