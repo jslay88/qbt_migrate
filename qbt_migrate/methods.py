@@ -9,9 +9,7 @@ from typing import Union
 logger = logging.getLogger(__name__)
 
 
-def backup_folder(
-    folder_path: Union[str, Path], archive_path: Union[str, Path], include_torrents: bool = True
-):
+def backup_folder(folder_path: Union[str, Path], archive_path: Union[str, Path], include_torrents: bool = True):
     logger.info(f"Creating Archive {archive_path} ...")
     folder_path = Path(folder_path)
     archive_path = Path(archive_path)
