@@ -9,6 +9,7 @@ from typing import Optional
 import bencodepy
 from bencodepy.exceptions import BencodeDecodeError
 
+from .enums import TargetOS
 from .methods import backup_folder, convert_slashes, discover_bt_backup_path
 
 
@@ -31,7 +32,7 @@ class QBTBatchMove(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         create_backup: bool = True,
         skip_bad_files: bool = False,
     ):
@@ -43,8 +44,8 @@ class QBTBatchMove(object):
         :type new_path: str
         :param regex_path: Existing and New Paths are regex patterns with capture groups
         :type regex_path: bool
-        :param target_os: If targeting a different OS than the source. Must be Windows, Linux, or Mac.
-        :type target_os: str
+        :param target_os: If targeting a different OS than the source.
+        :type target_os: TargetOS
         :param create_backup: Create a backup archive of the BT_backup directory?
         :type create_backup: bool
         :param skip_bad_files: Skip .fastresume files that cannot be read successfully.
@@ -115,7 +116,7 @@ class QBTBatchMove(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -162,7 +163,7 @@ class FastResume(object):
         self,
         path: str,
         key: str = "save_path",
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -181,7 +182,7 @@ class FastResume(object):
         self,
         path: str,
         qbt_path: Optional[str] = None,
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -210,7 +211,7 @@ class FastResume(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
