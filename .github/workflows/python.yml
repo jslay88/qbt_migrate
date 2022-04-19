@@ -1,0 +1,135 @@
+name: Python Checks
+# Python checks (usually tox matrix) to ensure code quality for PRs and merging
+# Runs on pull requests
+
+on: pull_request
+
+jobs:
+  tox:
+    name: Tox Matrix
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        toxenv:
+          - lint
+          - unittest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2.10.2
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**.py'
+              - 'tox.ini'
+
+      - name: Set up Python
+        uses: actions/setup-python@v2.2.2
+        if: steps.filter.outputs.python == 'true'
+        with:
+          python-version: 3.9
+
+      - name: Install Tox
+        if: steps.filter.outputs.python == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox
+
+      - name: Run Tox
+        if: steps.filter.outputs.python == 'true'
+        run: |
+          tox -e ${{ matrix.toxenv }}
+
+      - name: Store Test Coverage
+        if: steps.filter.outputs.python == 'true' && matrix.toxenv == 'unittest'
+        uses: actions/upload-artifact@v2.2.4
+        with:
+          name: coverage
+          path: ./coverage.xml
+
+  coverage:
+    runs-on: ubuntu-latest
+    name: Coverage
+    needs:
+      - tox
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v2.10.2
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**.py'
+              - 'tox.ini'
+
+      - name: Setup Python
+        uses: actions/setup-python@v2.2.2
+        if: steps.filter.outputs.python == 'true'
+        with:
+          python-version: 3.9
+
+      - name: Install Coverage & diff_cover
+        if: steps.filter.outputs.python == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install coverage diff_cover
+
+      - name: Retrieve Coverage Results
+        if: steps.filter.outputs.python == 'true'
+        uses: actions/download-artifact@v2.0.10
+        with:
+          name: coverage
+          path: coverage
+
+      - name: Check Coverage Diff
+        if: steps.filter.outputs.python == 'true'
+        run: |
+          diff-cover coverage/coverage.xml --compare-branch=origin/master --fail-under=100
+
+  build:
+    runs-on: ubuntu-latest
+    name: Build Python Package and Upload to TestPyPi
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2.10.2
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**.py'
+              - 'pyproject.toml'
+
+      - name: Set up Python
+        uses: actions/setup-python@v2.2.2
+        if: steps.filter.outputs.python == 'true'
+        with:
+          python-version: 3.9
+
+      - name: Install Flit
+        if: steps.filter.outputs.python == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install flit
+
+      - name: Build Python Package and Upload to TestPyPi
+        if: steps.filter.outputs.python == 'true'
+        env:
+          FLIT_USERNAME: __token__
+          FLIT_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
+          FLIT_INDEX_URL: https://test.pypi.org/legacy/
+        run: |
+          flit install --symlink --deps production
+          export VERSION_TAG=dev${GITHUB_RUN_ID}; flit publish
+
+      - name: Store Python Package as Artifact
+        uses: actions/upload-artifact@v2.2.4
+        if: steps.filter.outputs.python == 'true'
+        with:
+          name: dist
+          path: dist/

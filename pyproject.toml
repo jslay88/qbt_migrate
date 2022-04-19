@@ -1,0 +1,57 @@
+[build-system]
+requires = ["flit_core>=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "qbt_migrate"
+authors = [
+    {name = "Justin Slay", email = "justin.slay@gmail.com"},
+]
+dependencies = [
+    "bencode.py==4.0.0",
+]
+requires-python = ">=3.8"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Communications :: File Sharing",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Recovery Tools",
+    "Typing :: Typed",
+]
+dynamic = [
+    "version",
+    "description",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=2.7.3",
+    "tox"
+]
+
+[project.urls]
+Source = "https://github.com/jslay88/qbt_migrate"
+
+[project.scripts]
+qbt_migrate = "qbt_migrate.cli:main"
+
+[tool.black]
+line-length = 120
+target-version = ['py39']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 120
+lines_after_imports = 2
+skip = [".tox", "venv"]

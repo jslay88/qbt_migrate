@@ -1,0 +1,41 @@
+name: Package and Release
+# Build Python package for PyPi and GitGub release, and then publish a GitHub Release
+# Runs on semantic versioned tags only
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build, Upload, and Release
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v2.2.2
+        with:
+          python-version: 3.9
+
+      - name: Install Flit
+        run: |
+          python -m pip install --upgrade pip
+          pip install flit
+
+      - name: Build Python Package and Upload to PyPi
+        env:
+          FLIT_USERNAME: __token__
+          FLIT_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          FLIT_INDEX_URL: https://upload.pypi.org/legacy/
+        run: |
+          flit install --symlink --deps production
+          flit publish
+
+      - name: Create GitHub Release with Python Package
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
