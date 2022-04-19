@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def backup_folder(
-    folder_path: Union[str, os.PathLike], archive_path: Union[str, os.PathLike], include_torrents: bool = True
+    folder_path: Union[str, Path], archive_path: Union[str, Path], include_torrents: bool = True
 ):
     logger.info(f"Creating Archive {archive_path} ...")
     folder_path = Path(folder_path)
@@ -37,12 +37,12 @@ def discover_bt_backup_path():
     logger.debug("Discovering BT_backup path...")
     if sys.platform.startswith("win32"):
         logger.debug("Windows System")
-        return os.path.join(os.getenv("localappdata"), "qBittorrent\\BT_backup")
+        return Path(os.getenv("localappdata"), "qBittorrent\\BT_backup")
 
-    if os.path.isfile("/.dockerenv") and os.path.isdir("/config/qBittorrent/BT_backup"):
+    if Path("/.dockerenv").is_file() and Path("/config/qBittorrent/BT_backup").is_dir():
         # Default path for config under for image: https://docs.linuxserver.io/images/docker-qbittorrent
         logger.debug("qBittorrent Docker container detected")
         return "/config/qBittorrent/BT_backup"
 
     logger.debug("Linux/Mac System")
-    return os.path.join(os.getenv("HOME"), ".local/share/data/qBittorrent/BT_backup")
+    return Path(os.getenv("HOME"), ".local/share/data/qBittorrent/BT_backup")

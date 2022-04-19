@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 import re
 from datetime import datetime
 from threading import Thread
@@ -49,11 +50,11 @@ class QBTBatchMove(object):
         :param skip_bad_files: Skip .fastresume files that cannot be read successfully.
         :type skip_bad_files: bool
         """
-        if not os.path.exists(self.bt_backup_path) or not os.path.isdir(self.bt_backup_path):
+        if not Path(self.bt_backup_path).exists() or not Path(self.bt_backup_path).is_dir():
             raise NotADirectoryError(self.bt_backup_path)
         if create_backup:
             backup_filename = f'fastresume_backup{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
-            backup_folder(self.bt_backup_path, os.path.join(self.bt_backup_path, backup_filename))
+            backup_folder(self.bt_backup_path, Path(self.bt_backup_path, backup_filename))
 
         self.logger.info(f"Searching for .fastresume files with path {existing_path} ...")
         for fast_resume in self.discover_relevant_fast_resume(
