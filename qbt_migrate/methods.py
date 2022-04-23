@@ -5,6 +5,8 @@ import zipfile
 from pathlib import Path
 from typing import Union
 
+from .enums import TargetOS
+
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +23,10 @@ def backup_folder(folder_path: Union[str, Path], archive_path: Union[str, Path],
     logger.info("Done!")
 
 
-def convert_slashes(path: str, target_os: str):
-    if target_os.strip().lower() not in ("windows", "linux", "mac"):
-        raise ValueError(f"Target OS is not valid. Must be Windows, Linux, or Mac. Received: {target_os}")
-    if target_os.strip().lower() == "windows":
+def convert_slashes(path: str, target_os: TargetOS):
+    if target_os is not isinstance(target_os, TargetOS):
+        raise ValueError(f"Target OS is not valid. Must be enum TargetOs. Received: {type(target_os)}")
+    if target_os is TargetOS.WINDOWS:
         logger.debug("Convert to Windows Slashes")
         return path.replace("/", "\\")
     logger.debug("Convert to Unix Slashes")

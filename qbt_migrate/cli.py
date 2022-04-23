@@ -3,6 +3,7 @@ import logging
 import sys
 
 from . import QBTBatchMove, discover_bt_backup_path
+from .enums import TargetOS
 
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ def parse_args(args=None):
     parser.add_argument(
         "-r",
         "--regex",
-        help="Existing and New paths are regex patterns with capture groups.",
+        help="Existing and New paths are regex patterns. (Capture groups recommended).",
         action="store_true",
         default=None,
     )
@@ -85,15 +86,17 @@ def main():
         ):
             print("Please answer Windows, Linux, or Mac")
         args.target_os = answer.lower().strip()
+    if args.target_os:
+        args.target_os = TargetOS.WINDOWS if args.target_os in TargetOS.WINDOWS else TargetOS.POSIX
 
     # Handle Target OS Auto-Detect if not specified
     if not args.target_os.strip():
         if "/" in args.existing_path and "\\" in args.new_path:
             logger.info("Auto detected target OS change. Will convert slashes to Windows.")
-            args.target_os = "windows"
+            args.target_os = TargetOS.WINDOWS
         elif "\\" in args.existing_path and "/" in args.new_path:
             logger.info("Auto detected target OS change. Will convert slashes to Linux/Mac.")
-            args.target_os = "linux"
+            args.target_os = TargetOS.POSIX
         else:
             args.target_os = None
 
