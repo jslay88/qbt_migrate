@@ -85,11 +85,11 @@ def test_convert_slashes(path: str, target_os: TargetOS, expected_path: str):
     [
         (
             "win32",
-            "C:\\Users\\test\\AppData\\Local\\qBittorrent\\BT_backup",
+            Path("C:\\Users\\test\\AppData\\Local", "qBittorrent\\BT_backup"),
             {"localappdata": "C:\\Users\\test\\AppData\\Local"},
         ),
-        ("linux", "/home/test/.local/share/data/qBittorrent/BT_backup", {"HOME": "/home/test"}),
-        ("docker", "/config/qBittorrent/BT_backup", {}),
+        ("linux", Path("/home/test", ".local/share/data/qBittorrent/BT_backup"), {"HOME": "/home/test"}),
+        ("docker", Path("/config/qBittorrent/BT_backup"), {}),
     ],
 )
 def test_discover_bt_backup_path(monkeypatch, system: str, expected_path: str, envvar_overrides: dict):
@@ -105,4 +105,4 @@ def test_discover_bt_backup_path(monkeypatch, system: str, expected_path: str, e
         monkeypatch.setattr(methods_Path, "is_dir", mock_docker_env)
 
     monkeypatch.setattr(sys, "platform", system)
-    assert discover_bt_backup_path() == Path(expected_path)
+    assert discover_bt_backup_path() == expected_path
