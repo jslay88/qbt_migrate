@@ -34,9 +34,17 @@ dynamic = [
 ]
 
 [project.optional-dependencies]
-test = [
+dev = [
+    "black",
+    "coverage",
+    "diff-cover",
+    "flake8",
+    "isort",
+    "pre-commit",
     "pytest>=2.7.3",
-    "tox"
+]
+test = [
+    "tox",
 ]
 
 [project.urls]
