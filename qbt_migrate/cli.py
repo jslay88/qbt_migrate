@@ -2,7 +2,7 @@ import argparse
 import logging
 import sys
 
-from . import QBTBatchMove, discover_bt_backup_path
+from . import QBTBatchMove, __version__, discover_bt_backup_path
 from .enums import TargetOS
 
 
@@ -43,15 +43,33 @@ def parse_args(args=None):
         "-l", "--log-level", help="Log Level, Default is INFO.", choices=["DEBUG", "INFO"], default="INFO"
     )
 
+    parser.add_argument(
+        "-v",
+        "--version",
+        help=f"Prints the current version number and exits. Current qbt_migrate version: {__version__}",
+        action="store_true",
+        default=False,
+    )
+
     return parser.parse_args(args)
 
 
 def main():
     args = parse_args(sys.argv[1:])
-    logging.basicConfig()
+    fmt = (
+        "%(message)s"
+        if args.log_level == "INFO"
+        else "%(asctime)s :: %(levelname)s :: %(name)s.%(funcName)s: %(message)s"
+    )
+    logging.basicConfig(format=fmt)
     logger.setLevel(args.log_level)
     logging.getLogger("qbt_migrate").setLevel(args.log_level)
     logging.getLogger("qbt_migrate").propagate = True
+    if args.version:
+        logger.debug("Version Print requested.")
+        logger.info(f"{__version__}")
+        logger.debug("Exiting")
+        return
     qbm = QBTBatchMove()
     if args.bt_backup_path is not None:
         qbm.bt_backup_path = args.bt_backup_path

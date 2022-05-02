@@ -56,15 +56,18 @@ class QBTBatchMove(object):
             backup_filename = f'fastresume_backup{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
             backup_folder(self.bt_backup_path, self.bt_backup_path / backup_filename)
 
-        self.logger.info(f"Searching for .fastresume files with path {existing_path} ...")
+        self.logger.info(f"🕵️ Searching for .fastresume files with path {existing_path} ...")
+        count = 0
         for fast_resume in self.discover_relevant_fast_resume(
             self.bt_backup_path, existing_path, regex_path, not skip_bad_files
         ):
+            count += 1
             # Fire and forget
             self.discovered_files.add(fast_resume)
             Thread(
                 target=fast_resume.replace_paths, args=[existing_path, new_path, regex_path, target_os, True, False]
             ).start()
+        logger.info(f"{'✔️' if count else '⚠️'} Processed {count} relevant fastresume file{'s' if count > 1 else ''}!")
 
     @classmethod
     def discover_relevant_fast_resume(
@@ -92,9 +95,9 @@ class QBTBatchMove(object):
                     fast_resume = FastResume(bt_backup_path / file)
                 except (BencodeDecodeError, FileNotFoundError, ValueError) as e:
                     if raise_on_error:
-                        cls.logger.critical(f"Unable to parse {file}. Stopping Discovery!")
+                        cls.logger.critical(f"🛑 Unable to parse {file}. Stopping Discovery!")
                         raise e
-                    cls.logger.warning(f"Unable to parse {file}. Skipping!\n\n{e}")
+                    cls.logger.warning(f"⚠️ Unable to parse {file}. Skipping!\n\n{e}")
                     continue
                 if (fast_resume.save_path is not None and existing_path in fast_resume.save_path) or (
                     fast_resume.qbt_save_path is not None and existing_path in fast_resume.qbt_save_path
@@ -105,6 +108,11 @@ class QBTBatchMove(object):
                     or (fast_resume.qbt_save_path is not None and re.search(existing_path, fast_resume.qbt_save_path))
                 ):
                     yield fast_resume
+                else:
+                    logger.debug(
+                        f"FastResume {file} is not relevant, Save Path: {fast_resume.save_path}, "
+                        f"qBt-savePath: {fast_resume.qbt_save_path}"
+                    )
         return
 
     @classmethod
@@ -205,7 +213,7 @@ class FastResume(object):
     def save(self, file_name: Union[str, Path, None] = None):
         if file_name is None:
             file_name = self.file_path
-        self.logger.info(f"Saving File {file_name}...")
+        self.logger.debug(f"Saving File {file_name}...")
         bencode.write(self._data, file_name)
 
     def replace_paths(
@@ -217,7 +225,7 @@ class FastResume(object):
         save_file: bool = True,
         create_backup: bool = True,
     ):
-        self.logger.info(f"Replacing Paths in FastResume {self.file_path}...")
+        self.logger.debug(f"Replacing Paths in FastResume {self.file_path}...")
         if regex_path:
             new_save_path = None
             new_qbt_save_path = None
@@ -249,4 +257,4 @@ class FastResume(object):
             save_file=save_file,
             create_backup=create_backup,
         )
-        self.logger.info(f"FastResume ({self.file_path}) Paths Replaced!")
+        self.logger.debug(f"FastResume ({self.file_path}) Paths Replaced!")
