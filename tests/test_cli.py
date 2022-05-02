@@ -111,7 +111,7 @@ def test_main_version_check(monkeypatch):
     def mock_info(message):
         assert message == __version__
 
-    with patch("logging.info", mock_info):
+    with patch("qbt_migrate.cli.logger.info", mock_info):
         main()
 
 
