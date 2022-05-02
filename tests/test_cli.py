@@ -1,5 +1,8 @@
+from unittest.mock import patch
+
 import pytest
 
+from qbt_migrate import __version__
 from qbt_migrate.cli import main, parse_args
 from qbt_migrate.enums import TargetOS
 
@@ -100,6 +103,16 @@ def test_parse_args_target_os():
 
     with pytest.raises(SystemExit):
         args = parse_args(["-t", "windows"])
+
+
+def test_main_version_check(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["qbt_migrate", "-v"])
+
+    def mock_info(message):
+        assert message == __version__
+
+    with patch("logging.info", mock_info):
+        main()
 
 
 def test_main_with_inputs(monkeypatch):
