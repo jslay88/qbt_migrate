@@ -1,13 +1,14 @@
 import logging
-import os
 import re
 from datetime import datetime
+from pathlib import Path
 from threading import Thread
-from typing import Optional
+from typing import Optional, Union
 
 import bencodepy
 from bencodepy.exceptions import BencodeDecodeError
 
+from .enums import TargetOS
 from .methods import backup_folder, convert_slashes, discover_bt_backup_path
 
 
@@ -22,7 +23,7 @@ class QBTBatchMove(object):
         if bt_backup_path is None:
             bt_backup_path = discover_bt_backup_path()
         self.logger.debug(f"BT_backup Path: {bt_backup_path}")
-        self.bt_backup_path = bt_backup_path
+        self.bt_backup_path = Path(bt_backup_path)
         self.discovered_files = set()
 
     def run(
@@ -30,7 +31,7 @@ class QBTBatchMove(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         create_backup: bool = True,
         skip_bad_files: bool = False,
     ):
@@ -42,37 +43,40 @@ class QBTBatchMove(object):
         :type new_path: str
         :param regex_path: Existing and New Paths are regex patterns with capture groups
         :type regex_path: bool
-        :param target_os: If targeting a different OS than the source. Must be Windows, Linux, or Mac.
-        :type target_os: str
+        :param target_os: If targeting a different OS than the source.
+        :type target_os: TargetOS
         :param create_backup: Create a backup archive of the BT_backup directory?
         :type create_backup: bool
         :param skip_bad_files: Skip .fastresume files that cannot be read successfully.
         :type skip_bad_files: bool
         """
-        if not os.path.exists(self.bt_backup_path) or not os.path.isdir(self.bt_backup_path):
+        if not self.bt_backup_path.is_dir():
             raise NotADirectoryError(self.bt_backup_path)
         if create_backup:
             backup_filename = f'fastresume_backup{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
-            backup_folder(self.bt_backup_path, os.path.join(self.bt_backup_path, backup_filename))
+            backup_folder(self.bt_backup_path, self.bt_backup_path / backup_filename)
 
-        self.logger.info(f"Searching for .fastresume files with path {existing_path} ...")
+        self.logger.info(f"🕵️ Searching for .fastresume files with path {existing_path} ...")
+        count = 0
         for fast_resume in self.discover_relevant_fast_resume(
             self.bt_backup_path, existing_path, regex_path, not skip_bad_files
         ):
+            count += 1
             # Fire and forget
             self.discovered_files.add(fast_resume)
             Thread(
                 target=fast_resume.replace_paths, args=[existing_path, new_path, regex_path, target_os, True, False]
             ).start()
+        logger.info(f"{'✔️' if count else '⚠️'} Processed {count} relevant fastresume file{'s' if count > 1 else ''}!")
 
     @classmethod
     def discover_relevant_fast_resume(
-        cls, bt_backup_path: str, existing_path: str, regex_path: bool = False, raise_on_error: bool = True
+        cls, bt_backup_path: Union[str, Path], existing_path: str, regex_path: bool = False, raise_on_error: bool = True
     ):
         """
         Find .fastresume files that contain the existing path.
         :param bt_backup_path: Path to BT_backup folder
-        :type bt_backup_path: str
+        :type bt_backup_path: str | Path
         :param existing_path: The existing path to look for
         :type existing_path: str
         :param regex_path: Existing Path is a regex pattern with capture groups
@@ -82,29 +86,37 @@ class QBTBatchMove(object):
         :return: List of FastResume Objects
         :rtype: list[FastResume]
         """
-        for file in os.listdir(bt_backup_path):
-            if file.endswith(".fastresume"):
+        bt_backup_path = Path(bt_backup_path)
+        for file in bt_backup_path.iterdir():
+            if file.is_dir():
+                continue
+            if file.name.endswith(".fastresume"):
                 try:
-                    fast_resume = FastResume(os.path.join(bt_backup_path, file))
+                    fast_resume = FastResume(bt_backup_path / file)
                 except (BencodeDecodeError, FileNotFoundError, ValueError) as e:
                     if raise_on_error:
-                        cls.logger.critical(f"Unable to parse {file}. Stopping Discovery!")
+                        cls.logger.critical(f"🛑 Unable to parse {file}. Stopping Discovery!")
                         raise e
-                    cls.logger.warning(f"Unable to parse {file}. Skipping!\n\n{e}")
+                    cls.logger.warning(f"⚠️ Unable to parse {file}. Skipping!\n\n{e}")
                     continue
                 if (fast_resume.save_path is not None and existing_path in fast_resume.save_path) or (
                     fast_resume.qbt_save_path is not None and existing_path in fast_resume.qbt_save_path
                 ):
                     yield fast_resume
                 elif regex_path and (
-                    (fast_resume.save_path is not None and re.match(existing_path, fast_resume.save_path))
-                    or (fast_resume.qbt_save_path is not None and re.match(existing_path, fast_resume.qbt_save_path))
+                    (fast_resume.save_path is not None and re.search(existing_path, fast_resume.save_path))
+                    or (fast_resume.qbt_save_path is not None and re.search(existing_path, fast_resume.qbt_save_path))
                 ):
                     yield fast_resume
+                else:
+                    logger.debug(
+                        f"FastResume {file} is not relevant, Save Path: {fast_resume.save_path}, "
+                        f"qBt-savePath: {fast_resume.qbt_save_path}"
+                    )
         return
 
     @classmethod
-    def backup_folder(cls, folder_path: str, archive_path: str):
+    def backup_folder(cls, folder_path: Union[str, Path], archive_path: Union[str, Path]):
         return backup_folder(folder_path, archive_path)
 
     @classmethod
@@ -114,7 +126,7 @@ class QBTBatchMove(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -126,21 +138,21 @@ class QBTBatchMove(object):
 class FastResume(object):
     logger = logging.getLogger(__name__ + ".FastResume")
 
-    def __init__(self, file_path: str):
-        self._file_path = os.path.realpath(file_path)
-        if not os.path.exists(self.file_path) or not os.path.isfile(self.file_path):
+    def __init__(self, file_path: Union[str, Path]):
+        self._file_path = Path(file_path)
+        if not self.file_path.is_file():
             raise FileNotFoundError(self.file_path)
         self.logger.debug(f"Loading Fast Resume: {self.file_path}")
         self._data = bencode.read(self.file_path)
         self.logger.debug(f"Fast Resume ({self.file_path}) Init Complete.")
 
     @property
-    def file_path(self) -> str:
+    def file_path(self) -> Path:
         return self._file_path
 
     @property
-    def backup_filename(self) -> str:
-        return f'{self.file_path}.{datetime.now().strftime("%Y%m%d%H%M%S")}.bkup'
+    def backup_filename(self) -> Path:
+        return Path(f'{self.file_path}.{datetime.now().strftime("%Y%m%d%H%M%S")}.bkup')
 
     @property
     def save_path(self) -> Optional[str]:
@@ -161,7 +173,7 @@ class FastResume(object):
         self,
         path: str,
         key: str = "save_path",
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -180,7 +192,7 @@ class FastResume(object):
         self,
         path: str,
         qbt_path: Optional[str] = None,
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -198,10 +210,10 @@ class FastResume(object):
         if save_file:
             self.save()
 
-    def save(self, file_name: Optional[str] = None):
+    def save(self, file_name: Union[str, Path, None] = None):
         if file_name is None:
             file_name = self.file_path
-        self.logger.info(f"Saving File {file_name}...")
+        self.logger.debug(f"Saving File {file_name}...")
         bencode.write(self._data, file_name)
 
     def replace_paths(
@@ -209,11 +221,11 @@ class FastResume(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[str] = None,
+        target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
-        self.logger.info(f"Replacing Paths in FastResume {self.file_path}...")
+        self.logger.debug(f"Replacing Paths in FastResume {self.file_path}...")
         if regex_path:
             new_save_path = None
             new_qbt_save_path = None
@@ -245,4 +257,4 @@ class FastResume(object):
             save_file=save_file,
             create_backup=create_backup,
         )
-        self.logger.info(f"FastResume ({self.file_path}) Paths Replaced!")
+        self.logger.debug(f"FastResume ({self.file_path}) Paths Replaced!")

@@ -2,7 +2,8 @@ import argparse
 import logging
 import sys
 
-from . import QBTBatchMove, discover_bt_backup_path
+from . import QBTBatchMove, __version__, discover_bt_backup_path
+from .enums import TargetOS
 
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ def parse_args(args=None):
     parser.add_argument(
         "-r",
         "--regex",
-        help="Existing and New paths are regex patterns with capture groups.",
+        help="Existing and New paths are regex patterns. (Capture groups recommended).",
         action="store_true",
         default=None,
     )
@@ -42,15 +43,33 @@ def parse_args(args=None):
         "-l", "--log-level", help="Log Level, Default is INFO.", choices=["DEBUG", "INFO"], default="INFO"
     )
 
+    parser.add_argument(
+        "-v",
+        "--version",
+        help=f"Prints the current version number and exits. Current qbt_migrate version: {__version__}",
+        action="store_true",
+        default=False,
+    )
+
     return parser.parse_args(args)
 
 
 def main():
     args = parse_args(sys.argv[1:])
-    logging.basicConfig()
+    fmt = (
+        "%(message)s"
+        if args.log_level == "INFO"
+        else "%(asctime)s :: %(levelname)s :: %(name)s.%(funcName)s: %(message)s"
+    )
+    logging.basicConfig(format=fmt)
     logger.setLevel(args.log_level)
     logging.getLogger("qbt_migrate").setLevel(args.log_level)
     logging.getLogger("qbt_migrate").propagate = True
+    if args.version:
+        logger.debug("Version Print requested.")
+        logger.info(f"{__version__}")
+        logger.debug("Exiting")
+        return
     qbm = QBTBatchMove()
     if args.bt_backup_path is not None:
         qbm.bt_backup_path = args.bt_backup_path
@@ -85,15 +104,17 @@ def main():
         ):
             print("Please answer Windows, Linux, or Mac")
         args.target_os = answer.lower().strip()
+    if args.target_os:
+        args.target_os = TargetOS.WINDOWS if args.target_os.lower() in TargetOS.WINDOWS.value else TargetOS.POSIX
 
     # Handle Target OS Auto-Detect if not specified
-    if not args.target_os.strip():
+    if not args.target_os:
         if "/" in args.existing_path and "\\" in args.new_path:
             logger.info("Auto detected target OS change. Will convert slashes to Windows.")
-            args.target_os = "windows"
+            args.target_os = TargetOS.WINDOWS
         elif "\\" in args.existing_path and "/" in args.new_path:
             logger.info("Auto detected target OS change. Will convert slashes to Linux/Mac.")
-            args.target_os = "linux"
+            args.target_os = TargetOS.POSIX
         else:
             args.target_os = None
 

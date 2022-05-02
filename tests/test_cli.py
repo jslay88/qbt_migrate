@@ -1,6 +1,10 @@
+from unittest.mock import patch
+
 import pytest
 
+from qbt_migrate import __version__
 from qbt_migrate.cli import main, parse_args
+from qbt_migrate.enums import TargetOS
 
 
 class MockQBTBatchMove:
@@ -101,6 +105,16 @@ def test_parse_args_target_os():
         args = parse_args(["-t", "windows"])
 
 
+def test_main_version_check(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["qbt_migrate", "-v"])
+
+    def mock_info(message):
+        assert message == __version__
+
+    with patch("qbt_migrate.cli.logger.info", mock_info):
+        main()
+
+
 def test_main_with_inputs(monkeypatch):
     mock_user_input = MockUserInput(["bt-backup-path", "existing-path", "new-path", "no", "windows"])
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
@@ -112,7 +126,7 @@ def test_main_with_inputs(monkeypatch):
     assert MockQBTBatchMove.run_call[0][0] == "existing-path"
     assert MockQBTBatchMove.run_call[0][1] == "new-path"
     assert MockQBTBatchMove.run_call[0][2] is False
-    assert MockQBTBatchMove.run_call[0][3] == "windows"
+    assert MockQBTBatchMove.run_call[0][3] is TargetOS.WINDOWS
     assert MockQBTBatchMove.run_call[0][4] is True
     assert MockQBTBatchMove.run_call[0][5] is False
 
@@ -141,7 +155,7 @@ def test_main_with_args(monkeypatch):
     assert MockQBTBatchMove.run_call[0][0] == "different-existing-path"
     assert MockQBTBatchMove.run_call[0][1] == "different-new-path"
     assert MockQBTBatchMove.run_call[0][2] is True
-    assert MockQBTBatchMove.run_call[0][3] == "Windows"
+    assert MockQBTBatchMove.run_call[0][3] is TargetOS.WINDOWS
     assert MockQBTBatchMove.run_call[0][4] is True
     assert MockQBTBatchMove.run_call[0][5] is True
 
@@ -157,7 +171,7 @@ def test_main_invalid_input_loops(monkeypatch):
     assert MockQBTBatchMove.run_call[0][0] == "e-path"
     assert MockQBTBatchMove.run_call[0][1] == "n-path"
     assert MockQBTBatchMove.run_call[0][2] is True
-    assert MockQBTBatchMove.run_call[0][3] == "windows"
+    assert MockQBTBatchMove.run_call[0][3] is TargetOS.WINDOWS
     assert MockQBTBatchMove.run_call[0][4] is True
     assert MockQBTBatchMove.run_call[0][5] is True
 
@@ -175,10 +189,10 @@ def test_main_target_os_auto_detect(monkeypatch):
     mock_user_input = MockUserInput(["bt-backup-path", "C:\\existing\\path", "/new/path", "no", ""])
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
     main()
-    assert MockQBTBatchMove.run_call[0][3] == "linux"
+    assert MockQBTBatchMove.run_call[0][3] is TargetOS.POSIX
 
     # Test Linux to Windows
     mock_user_input = MockUserInput(["bt-backup-path", "/existing/path", "C:\\new\\path", "no", ""])
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
     main()
-    assert MockQBTBatchMove.run_call[0][3] == "windows"
+    assert MockQBTBatchMove.run_call[0][3] is TargetOS.WINDOWS
