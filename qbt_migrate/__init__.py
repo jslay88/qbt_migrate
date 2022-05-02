@@ -6,6 +6,6 @@ from .classes import FastResume, QBTBatchMove
 from .methods import convert_slashes, discover_bt_backup_path
 
 
-__version__ = "2.2.2" + os.getenv("VERSION_TAG", "")
+__version__ = "2.3.0" + os.getenv("VERSION_TAG", "")
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
