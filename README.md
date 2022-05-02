@@ -12,15 +12,15 @@ Install from PyPi using `pip`, or jump to [Examples](#Examples) for Docker
 
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
-    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-l {DEBUG,INFO}]
+    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-l {DEBUG,INFO}] [-v]
 
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
       -e EXISTING_PATH, --existing-path EXISTING_PATH
                             Existing root of path to look for.
       -n NEW_PATH, --new-path NEW_PATH
                             New root path to replace existing root path with.
-      -r, --regex           Existing and New paths are regex patterns with capture groups.
+      -r, --regex           Existing and New paths are regex patterns. (Capture groups recommended).
       -t {Windows,Linux,Mac}, --target-os {Windows,Linux,Mac}
                             Target OS (converts slashes). Default will auto-detect if conversion is needed based on existing vs new.
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
@@ -28,6 +28,7 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
       -s, --skip-bad-files  Skips bad .fastresume files instead of exiting. Default behavior is to exit.
       -l {DEBUG,INFO}, --log-level {DEBUG,INFO}
                             Log Level, Default is INFO.
+      -v, --version         Prints the current version number and exits.
 
 By default, everything happens in the BT_backup directory defined by the OS the script is running on.
 Override `BT_backup` path if needed.
