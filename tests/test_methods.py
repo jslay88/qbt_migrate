@@ -1,6 +1,3 @@
-import ntpath
-import os
-import posixpath
 import re
 import sys
 import tempfile
@@ -9,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from qbt_migrate.enums import TargetOS
+from qbt_migrate.methods import Path as methods_Path
 from qbt_migrate.methods import backup_folder, convert_slashes, discover_bt_backup_path
 
 
@@ -66,16 +65,14 @@ def test_backup_folder():
 @pytest.mark.parametrize(
     "path, target_os, expected_path",
     [
-        ("C:/some/path", "windows", "C:\\some\\path"),
-        ("C:\\some\\path", "windows", "C:\\some\\path"),
-        ("\\some\\path\\for\\linux", "linux", "/some/path/for/linux"),
-        ("/some/path/for/linux", "linux", "/some/path/for/linux"),
-        ("\\some\\path\\for\\mac", "mac", "/some/path/for/mac"),
-        ("/some/path/for/mac", "mac", "/some/path/for/mac"),
+        ("C:/some/path", TargetOS.WINDOWS, "C:\\some\\path"),
+        ("C:\\some\\path", TargetOS.WINDOWS, "C:\\some\\path"),
+        ("\\some\\path\\for\\linux", TargetOS.POSIX, "/some/path/for/linux"),
+        ("/some/path/for/linux", TargetOS.POSIX, "/some/path/for/linux"),
         (None, "invalid_os", None),
     ],
 )
-def test_convert_slashes(path: str, target_os: str, expected_path: str):
+def test_convert_slashes(path: str, target_os: TargetOS, expected_path: str):
     if target_os == "invalid_os":
         with pytest.raises(ValueError):
             convert_slashes(path, target_os)
@@ -87,27 +84,25 @@ def test_convert_slashes(path: str, target_os: str, expected_path: str):
     "system, expected_path, envvar_overrides",
     [
         (
-            ("win32", ntpath),
+            "win32",
             "C:\\Users\\test\\AppData\\Local\\qBittorrent\\BT_backup",
             {"localappdata": "C:\\Users\\test\\AppData\\Local"},
         ),
-        (("linux", posixpath), "/home/test/.local/share/data/qBittorrent/BT_backup", {"HOME": "/home/test"}),
-        (("docker", posixpath), "/config/qBittorrent/BT_backup", {}),
+        ("linux", "/home/test/.local/share/data/qBittorrent/BT_backup", {"HOME": "/home/test"}),
+        ("docker", "/config/qBittorrent/BT_backup", {}),
     ],
 )
-def test_discover_bt_backup_path(monkeypatch, system: tuple, expected_path: str, envvar_overrides: dict):
+def test_discover_bt_backup_path(monkeypatch, system: str, expected_path: str, envvar_overrides: dict):
     for env, val in envvar_overrides.items():
         monkeypatch.setenv(env, val)
-    system, os_path_lib = system
-    monkeypatch.setattr(os, "path", os_path_lib)
     if system == "docker":
         system = "linux"
 
         def mock_docker_env(_):
             return True
 
-        monkeypatch.setattr(os.path, "isfile", mock_docker_env)
-        monkeypatch.setattr(os.path, "isdir", mock_docker_env)
+        monkeypatch.setattr(methods_Path, "is_file", mock_docker_env)
+        monkeypatch.setattr(methods_Path, "is_dir", mock_docker_env)
 
     monkeypatch.setattr(sys, "platform", system)
-    assert discover_bt_backup_path() == expected_path
+    assert discover_bt_backup_path() == Path(expected_path)

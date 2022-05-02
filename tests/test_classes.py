@@ -1,6 +1,4 @@
 import glob
-import os
-import posixpath
 import shutil
 import sys
 import tempfile
@@ -12,13 +10,13 @@ from bencodepy.exceptions import BencodeDecodeError
 
 import qbt_migrate
 from qbt_migrate.classes import FastResume, QBTBatchMove
+from qbt_migrate.enums import TargetOS
 
 
 @pytest.fixture
 def linux_env(monkeypatch):
     monkeypatch.setenv("HOME", "/home/test")
     monkeypatch.setattr(sys, "platform", "linux")
-    monkeypatch.setattr(os, "path", posixpath)
 
 
 @pytest.fixture
@@ -40,7 +38,7 @@ def temp_file(mode="w"):
 )
 def test_qbt_batch_move_init(linux_env, bt_backup_path, expected_bt_backup_path):
     qbt = QBTBatchMove(bt_backup_path)
-    assert qbt.bt_backup_path == expected_bt_backup_path
+    assert isinstance(qbt.bt_backup_path, Path) is True
     assert isinstance(qbt.discovered_files, set)
 
 
@@ -103,9 +101,11 @@ def test_qbt_batch_move_run_create_backup_and_backup_folder(monkeypatch, temp_di
 
         def mock_create_backup(self, directory: str, archive: str):
             self.called = True
+            directory = Path(directory)
+            archive = Path(archive)
             assert directory == temp_dir
-            assert archive.startswith(os.path.join(temp_dir, "fastresume_backup"))
-            assert archive.endswith(".zip")
+            assert str(archive).startswith(str(temp_dir / "fastresume_backup"))
+            assert archive.name.endswith(".zip")
 
     mock = MockCaller()
     monkeypatch.setattr(qbt_migrate.classes, "backup_folder", mock.mock_create_backup)
@@ -118,7 +118,7 @@ def test_qbt_batch_move_run_create_backup_and_backup_folder(monkeypatch, temp_di
 
     mock.called = False  # Reset MockCaller
     qbt = QBTBatchMove(temp_dir)
-    qbt.backup_folder(temp_dir, os.path.join(temp_dir, "fastresume_backup.zip"))
+    qbt.backup_folder(temp_dir, temp_dir / "fastresume_backup.zip")
     assert mock.called is True
 
 
@@ -178,9 +178,9 @@ def test_fastresume_properties(temp_dir):
         print(f"Copying {file} to {temp_dir / file.name}")
         shutil.copy(file, temp_dir / file.name)
         fast_resume = FastResume(temp_dir / file.name)
-        assert fast_resume.file_path == str(temp_dir / file.name)
-        assert fast_resume.backup_filename.startswith(str(temp_dir / file.name))
-        assert fast_resume.backup_filename.endswith(".bkup")
+        assert fast_resume.file_path == Path(temp_dir / file.name)
+        assert str(fast_resume.backup_filename).startswith(str(temp_dir / file.name))
+        assert fast_resume.backup_filename.name.endswith(".bkup")
         if "save_path" in fast_resume._data:
             assert fast_resume.save_path == fast_resume._data["save_path"]
         if "qBt-savePath" in fast_resume._data:
@@ -232,14 +232,11 @@ def test_fastresume_set_save_path(monkeypatch):
     fast_resume.set_save_path("/target\\is/none", save_file=False, create_backup=False)
     assert fast_resume.save_path == "/target\\is/none"
     # Test target_os windows
-    fast_resume.set_save_path("C:/target/windows", target_os="windows", save_file=False, create_backup=False)
+    fast_resume.set_save_path("C:/target/windows", target_os=TargetOS.WINDOWS, save_file=False, create_backup=False)
     assert fast_resume.save_path == "C:\\target\\windows"
     # Test target_os linux
-    fast_resume.set_save_path("\\target\\linux", target_os="linux", save_file=False, create_backup=False)
+    fast_resume.set_save_path("\\target\\linux", target_os=TargetOS.POSIX, save_file=False, create_backup=False)
     assert fast_resume.save_path == "/target/linux"
-    # Test target_os mac
-    fast_resume.set_save_path("\\target\\mac", target_os="mac", save_file=False, create_backup=False)
-    assert fast_resume.save_path == "/target/mac"
 
     mock.reset()
     # Test save_file
@@ -256,8 +253,8 @@ def test_fastresume_set_save_path(monkeypatch):
     assert mock.called
     assert len(mock.saved_file_names) == 1
     for file_name in mock.saved_file_names:
-        assert "good.fastresume." in file_name
-        assert file_name.endswith(".bkup")
+        assert "good.fastresume." in file_name.name
+        assert file_name.name.endswith(".bkup")
 
 
 def test_fastresume_set_save_paths(monkeypatch):
@@ -278,7 +275,7 @@ def test_fastresume_set_save_paths(monkeypatch):
     assert fast_resume.qbt_save_path == "/this/is/a/qbt/path"
 
     # Test mapped_files convert slashes (replacing of paths happens with `replace_paths`)
-    fast_resume.set_save_paths("C:/this/is/a/path", target_os="windows")
+    fast_resume.set_save_paths("C:/this/is/a/path", target_os=TargetOS.WINDOWS)
     assert len(fast_resume.mapped_files) > 0
     for mapped_file in fast_resume.mapped_files:
         assert mapped_file.startswith("\\some\\test\\path\\")
@@ -300,7 +297,7 @@ def test_fastresume_save(monkeypatch):
     assert mock.called
     assert len(mock.saved_file_names) == 1
     for file_name in mock.saved_file_names:
-        assert file_name.endswith("good.fastresume")
+        assert file_name.name.endswith("good.fastresume")
 
     mock.reset()
     # Test calling with file name

@@ -24,7 +24,7 @@ def backup_folder(folder_path: Union[str, Path], archive_path: Union[str, Path],
 
 
 def convert_slashes(path: str, target_os: TargetOS):
-    if target_os is not isinstance(target_os, TargetOS):
+    if not isinstance(target_os, TargetOS):
         raise ValueError(f"Target OS is not valid. Must be enum TargetOs. Received: {type(target_os)}")
     if target_os is TargetOS.WINDOWS:
         logger.debug("Convert to Windows Slashes")
@@ -42,7 +42,7 @@ def discover_bt_backup_path():
     if Path("/.dockerenv").is_file() and Path("/config/qBittorrent/BT_backup").is_dir():
         # Default path for config under for image: https://docs.linuxserver.io/images/docker-qbittorrent
         logger.debug("qBittorrent Docker container detected")
-        return "/config/qBittorrent/BT_backup"
+        return Path("/config/qBittorrent/BT_backup")
 
     logger.debug("Linux/Mac System")
     return Path(os.getenv("HOME"), ".local/share/data/qBittorrent/BT_backup")

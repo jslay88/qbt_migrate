@@ -87,10 +87,10 @@ def main():
             print("Please answer Windows, Linux, or Mac")
         args.target_os = answer.lower().strip()
     if args.target_os:
-        args.target_os = TargetOS.WINDOWS if args.target_os in TargetOS.WINDOWS else TargetOS.POSIX
+        args.target_os = TargetOS.WINDOWS if args.target_os.lower() in TargetOS.WINDOWS.value else TargetOS.POSIX
 
     # Handle Target OS Auto-Detect if not specified
-    if not args.target_os.strip():
+    if not args.target_os:
         if "/" in args.existing_path and "\\" in args.new_path:
             logger.info("Auto detected target OS change. Will convert slashes to Windows.")
             args.target_os = TargetOS.WINDOWS
