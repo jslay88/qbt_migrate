@@ -1,4 +1,5 @@
 import glob
+import os
 import shutil
 import sys
 import tempfile
@@ -50,6 +51,9 @@ def test_qbt_batch_move_discover_relevant_fast_resume(temp_dir):
         file = Path(file)
         print(f"Copying {file} to {temp_dir / file.name}")
         shutil.copy(file, temp_dir / file.name)
+    # Create some dirs to make sure they are skipped, we only want top level for BT_backup
+    for x in range(3):
+        os.makedirs(temp_dir / f"test_dir_{x}")
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "", False, True))
     assert len(fast_resume_files) == 4
     fast_resume_files = list(QBTBatchMove.discover_relevant_fast_resume(temp_dir, "/some/test", False, True))
