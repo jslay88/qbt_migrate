@@ -4,6 +4,8 @@
 This tool changes the root paths of existing torrents in qBittorrent.
 It can also convert slashes when migrating between Windows and Linux/Mac.
 
+![Demo](demo.gif)
+
 ## Usage
 
 Install from PyPi using `pip`, or jump to [Examples](#Examples) for Docker
