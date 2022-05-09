@@ -1,12 +1,14 @@
 # qBt Migrate
 ![Python](https://github.com/jslay88/qbt_migrate/actions/workflows/python.yml/badge.svg)
 
-This tool changes the root paths of existing torrents in qBittorrent.
+This tool changes the paths of existing torrents in qBittorrent in a bulk fashion.
 It can also convert slashes when migrating between Windows and Linux/Mac.
 
 ![Demo](demo.gif)
 
 ## Usage
+**ALWAYS** ensure qBittorrent is closed before running `qbt_migrate`.
+Either quit through `File` -> `Exit`, task tray icon, or task manager for your system.
 
 Install from PyPi using `pip`, or jump to [Examples](#Examples) for Docker
 
@@ -38,6 +40,7 @@ Override `BT_backup` path if needed.
 Default BT_backup paths:
 * Windows: `%LOCALAPPDATA%/qBittorrent/BT_backup`
 * Linux/Mac: `$HOME/.local/share/data/qBittorrent/BT_backup`
+* Docker: `/config/qBittorrent/BT_backup`
 
 A backup zip archive is automatically created in the `BT_backup` directory.
 
