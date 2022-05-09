@@ -84,7 +84,11 @@ def main():
 
     # Get Valid Regex Input
     if args.regex is None:
-        while (answer := input("Regex Paths with Capture Groups [y/N]: ").lower().strip()) not in (
+        while (
+            answer := input("Existing and New paths are regex patterns (capture groups recommended)? [y/N]: ")
+            .lower()
+            .strip()
+        ) not in (
             "y",
             "yes",
             "n",
