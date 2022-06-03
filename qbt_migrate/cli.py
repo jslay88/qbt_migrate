@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+from pathlib import Path
 
 from . import QBTBatchMove, __version__, discover_bt_backup_path
 from .enums import TargetOS
@@ -72,11 +73,11 @@ def main():
         return
     qbm = QBTBatchMove()
     if args.bt_backup_path is not None:
-        qbm.bt_backup_path = args.bt_backup_path
+        qbm.bt_backup_path = Path(args.bt_backup_path.strip())
     else:
         bt_backup_path = input(f"BT_backup Path {qbm.bt_backup_path}: ")
         if bt_backup_path.strip():
-            qbm.bt_backup_path = bt_backup_path
+            qbm.bt_backup_path = Path(bt_backup_path.strip())
     if args.existing_path is None:
         args.existing_path = input("Existing Path: ")
     if args.new_path is None:
@@ -84,7 +85,11 @@ def main():
 
     # Get Valid Regex Input
     if args.regex is None:
-        while (answer := input("Regex Paths with Capture Groups [y/N]: ").lower().strip()) not in (
+        while (
+            answer := input("Existing and New paths are regex patterns (capture groups recommended)? [y/N]: ")
+            .lower()
+            .strip()
+        ) not in (
             "y",
             "yes",
             "n",
