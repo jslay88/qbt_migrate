@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -121,7 +122,7 @@ def test_main_with_inputs(monkeypatch):
     monkeypatch.setattr("qbt_migrate.cli.QBTBatchMove", MockQBTBatchMove)
     monkeypatch.setattr("sys.argv", ["qbt_migrate"])
     main()
-    assert MockQBTBatchMove.instance.bt_backup_path == "bt-backup-path"
+    assert MockQBTBatchMove.instance.bt_backup_path == Path("bt-backup-path")
     assert len(MockQBTBatchMove.run_call[0]) == 6
     assert MockQBTBatchMove.run_call[0][0] == "existing-path"
     assert MockQBTBatchMove.run_call[0][1] == "new-path"
@@ -150,7 +151,7 @@ def test_main_with_args(monkeypatch):
         ],
     )
     main()
-    assert MockQBTBatchMove.instance.bt_backup_path == "different-bt-backup-path"
+    assert MockQBTBatchMove.instance.bt_backup_path == Path("different-bt-backup-path")
     assert len(MockQBTBatchMove.run_call[0]) == 6
     assert MockQBTBatchMove.run_call[0][0] == "different-existing-path"
     assert MockQBTBatchMove.run_call[0][1] == "different-new-path"
@@ -166,7 +167,7 @@ def test_main_invalid_input_loops(monkeypatch):
     mock_user_input = MockUserInput(["not-valid", "yes", "not-valid", "windows"])
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
     main()
-    assert MockQBTBatchMove.instance.bt_backup_path == "backup-path"
+    assert MockQBTBatchMove.instance.bt_backup_path == Path("backup-path")
     assert len(MockQBTBatchMove.run_call[0]) == 6
     assert MockQBTBatchMove.run_call[0][0] == "e-path"
     assert MockQBTBatchMove.run_call[0][1] == "n-path"
