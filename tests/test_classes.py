@@ -189,6 +189,8 @@ def test_fastresume_properties(temp_dir):
             assert fast_resume.save_path == fast_resume._data["save_path"]
         if "qBt-savePath" in fast_resume._data:
             assert fast_resume.qbt_save_path == fast_resume._data["qBt-savePath"]
+        if "qBt-downloadPath" in fast_resume._data:
+            assert fast_resume.qbt_download_path == fast_resume._data["qBt-downloadPath"]
         assert (
             fast_resume.mapped_files == fast_resume._data["mapped_files"]
             if "mapped_files" in fast_resume._data
@@ -228,8 +230,10 @@ def test_fastresume_set_save_path(monkeypatch):
     # Explicitly test setting of key
     fast_resume.set_save_path("/this/is/a/test", save_file=False, create_backup=False)
     fast_resume.set_save_path("/this/is/a/test", key="qBt-savePath", save_file=False, create_backup=False)
+    fast_resume.set_save_path("/this/is/a/test", key="qBt-downloadPath", save_file=False, create_backup=False)
     assert fast_resume.save_path == "/this/is/a/test"
     assert fast_resume.qbt_save_path == "/this/is/a/test"
+    assert fast_resume.qbt_download_path == "/this/is/a/test"
 
     mock.reset()
     # Test target_os None
@@ -273,10 +277,12 @@ def test_fastresume_set_save_paths(monkeypatch):
     fast_resume.set_save_paths("/this/is/a/path")
     assert fast_resume.save_path == "/this/is/a/path"
     assert fast_resume.qbt_save_path == "/this/is/a/path"
+    assert fast_resume.qbt_download_path == "/this/is/a/path"
     # Test with differing qBt-savePath
-    fast_resume.set_save_paths("/this/is/a/path", "/this/is/a/qbt/path")
+    fast_resume.set_save_paths("/this/is/a/path", "/this/is/a/qbt/path", "/this/is/a/qbt/download/path")
     assert fast_resume.save_path == "/this/is/a/path"
     assert fast_resume.qbt_save_path == "/this/is/a/qbt/path"
+    assert fast_resume.qbt_download_path == "/this/is/a/qbt/download/path"
 
     # Test mapped_files convert slashes (replacing of paths happens with `replace_paths`)
     fast_resume.set_save_paths("C:/this/is/a/path", target_os=TargetOS.WINDOWS)
@@ -289,6 +295,11 @@ def test_fastresume_set_save_paths(monkeypatch):
     fast_resume.set_save_paths("/this/is/a/path")
     assert fast_resume.save_path == "/this/is/a/path"
     assert fast_resume.qbt_save_path == "/this/is/a/path"
+
+    # Test missing qBt-downloadPath key, stays missing
+    del fast_resume._data["qBt-downloadPath"]
+    fast_resume.set_save_paths("/this/is/a/path")
+    assert fast_resume.qbt_download_path is None
 
 
 def test_fastresume_save(monkeypatch):
@@ -317,6 +328,7 @@ def test_fastresume_replace_paths(monkeypatch):
     fast_resume.replace_paths("/some/test", "/a/new/test", save_file=False, create_backup=False)
     assert fast_resume.save_path == "/a/new/test/path"
     assert fast_resume.qbt_save_path == "/a/new/test/path"
+    assert fast_resume.qbt_download_path == "/a/new/test/path"
     assert len(fast_resume.mapped_files) > 0
     for mapped_file in fast_resume.mapped_files:
         assert mapped_file.startswith("/a/new/test/path")
@@ -327,6 +339,7 @@ def test_fastresume_replace_paths_regex(monkeypatch):
     fast_resume.replace_paths(r"/some/(\w+)/.*$", r"/\1/regex", True, save_file=False, create_backup=False)
     assert fast_resume.save_path == "/test/regex"
     assert fast_resume.qbt_save_path == "/test/regex"
+    assert fast_resume.qbt_download_path == "/test/regex"
     assert len(fast_resume.mapped_files) > 0
     for mapped_file in fast_resume.mapped_files:
         assert mapped_file.startswith("/test/regex")

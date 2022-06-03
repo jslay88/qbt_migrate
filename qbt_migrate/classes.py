@@ -160,6 +160,11 @@ class FastResume(object):
             return self._data["save_path"]
 
     @property
+    def qbt_download_path(self) -> Optional[str]:
+        if "qBt-downloadPath" in self._data:
+            return self._data["qBt-downloadPath"]
+
+    @property
     def qbt_save_path(self) -> Optional[str]:
         if "qBt-savePath" in self._data:
             return self._data["qBt-savePath"]
@@ -177,7 +182,7 @@ class FastResume(object):
         save_file: bool = True,
         create_backup: bool = True,
     ):
-        if key not in ["save_path", "qBt-savePath"]:
+        if key not in ["save_path", "qBt-savePath", "qBt-downloadPath"]:
             raise KeyError("When setting a save path, key must be `save_path` or `qBt-savePath`. " f"Received {key}")
         if create_backup:
             self.save(self.backup_filename)
@@ -192,6 +197,7 @@ class FastResume(object):
         self,
         path: str,
         qbt_path: Optional[str] = None,
+        qbt_download_path: Optional[str] = None,
         target_os: Optional[TargetOS] = None,
         save_file: bool = True,
         create_backup: bool = True,
@@ -204,6 +210,14 @@ class FastResume(object):
         qbt_path = path if qbt_path is None else qbt_path
         if qbt_path:
             self.set_save_path(qbt_path, key="qBt-savePath", target_os=target_os, save_file=False, create_backup=False)
+        if qbt_download_path:
+            self.set_save_path(
+                qbt_download_path, key="qBt-downloadPath", target_os=target_os, save_file=False, create_backup=False
+            )
+        elif self.qbt_download_path:
+            self.set_save_path(
+                self.qbt_save_path, key="qBt-downloadPath", target_os=target_os, save_file=False, create_backup=False
+            )
         if self.mapped_files is not None and target_os is not None:
             self.logger.debug("Converting Slashes for mapped_files...")
             self._data["mapped_files"] = [convert_slashes(path, target_os) for path in self.mapped_files]
@@ -229,6 +243,7 @@ class FastResume(object):
         if regex_path:
             new_save_path = None
             new_qbt_save_path = None
+            new_qbt_download_path = None
             pattern = re.compile(existing_path)
             if self.save_path:
                 new_save_path = pattern.sub(new_path, self.save_path)
@@ -236,12 +251,17 @@ class FastResume(object):
                 new_qbt_save_path = pattern.sub(new_path, self.qbt_save_path)
                 if not self.save_path:
                     new_save_path = new_qbt_save_path
+            if self.qbt_download_path:
+                new_qbt_download_path = pattern.sub(new_path, self.qbt_download_path)
             if self.mapped_files:
                 self._data["mapped_files"] = [pattern.sub(new_path, path) for path in self.mapped_files]
         else:
             new_save_path = self.save_path.replace(existing_path, new_path) if self.save_path is not None else None
             new_qbt_save_path = (
                 self.qbt_save_path.replace(existing_path, new_path) if self.qbt_save_path is not None else None
+            )
+            new_qbt_download_path = (
+                self.qbt_download_path.replace(existing_path, new_path) if self.qbt_download_path is not None else None
             )
             if not self.save_path:
                 new_save_path = new_qbt_save_path
@@ -253,6 +273,7 @@ class FastResume(object):
         self.set_save_paths(
             path=str(new_save_path),
             qbt_path=new_qbt_save_path,
+            qbt_download_path=new_qbt_download_path,
             target_os=target_os,
             save_file=save_file,
             create_backup=create_backup,
