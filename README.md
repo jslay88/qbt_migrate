@@ -6,6 +6,14 @@ It can also convert slashes when migrating between Windows and Linux/Mac.
 
 ![Demo](demo.gif)
 
+**Also check out my Chrome Extension for handling TV Episode torrents.**
+
+**qBt TV Torrent Upload**
+
+**[Chrome Web Store](https://chrome.google.com/webstore/detail/qbt-tv-torrent-upload/fhoodbpeaagldkgefdpcnilmjjncihpf)**
+
+**[Source](https://github.com/jslay88/qbt_tv_torrent_uploader)**
+
 ## Usage
 **ALWAYS** ensure qBittorrent is closed before running `qbt_migrate`.
 Either quit through `File` -> `Exit`, task tray icon, or task manager for your system.
