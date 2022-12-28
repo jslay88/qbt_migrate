@@ -202,6 +202,13 @@ class FastResume(object):
         save_file: bool = True,
         create_backup: bool = True,
     ):
+        self.logger.debug(f"Set Save Paths in {self.file_path}...")
+        self.logger.debug(f"path: {path}")
+        self.logger.debug(f"qbt_path: {qbt_path}")
+        self.logger.debug(f"qbt_download_path: {qbt_download_path}")
+        self.logger.debug(f"target_os: {target_os}")
+        self.logger.debug(f"save_file: {save_file}")
+        self.logger.debug(f"create_backup: {create_backup}")
         if create_backup:
             self.save(self.backup_filename)
         if not path.strip():
@@ -240,6 +247,12 @@ class FastResume(object):
         create_backup: bool = True,
     ):
         self.logger.debug(f"Replacing Paths in FastResume {self.file_path}...")
+        self.logger.debug(f"Existing Path: {existing_path}")
+        self.logger.debug(f"New Path: {new_path}")
+        self.logger.debug(f"Regex Path: {regex_path}")
+        self.logger.debug(f"Target OS: {target_os}")
+        self.logger.debug(f"Save File: {save_file}")
+        self.logger.debug(f"Create Backup: {create_backup}")
         if regex_path:
             new_save_path = None
             new_qbt_save_path = None
@@ -258,10 +271,18 @@ class FastResume(object):
         else:
             new_save_path = self.save_path.replace(existing_path, new_path) if self.save_path is not None else None
             new_qbt_save_path = (
-                self.qbt_save_path.replace(existing_path, new_path) if self.qbt_save_path is not None else None
+                self.qbt_save_path.replace(
+                    convert_slashes(existing_path, TargetOS.POSIX), convert_slashes(new_path, TargetOS.POSIX)
+                )
+                if self.qbt_save_path is not None
+                else None
             )
             new_qbt_download_path = (
-                self.qbt_download_path.replace(existing_path, new_path) if self.qbt_download_path is not None else None
+                self.qbt_download_path.replace(
+                    convert_slashes(existing_path, TargetOS.POSIX), convert_slashes(new_path, TargetOS.POSIX)
+                )
+                if self.qbt_download_path is not None
+                else None
             )
             if not self.save_path:
                 new_save_path = new_qbt_save_path

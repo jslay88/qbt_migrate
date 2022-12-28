@@ -1,10 +1,8 @@
-FROM python:3-alpine
+ARG PYTHON_VERSION="3.11"
+FROM python:${PYTHON_VERSION}-alpine
 ENV BT_BACKUP_PATH=/tmp/BT_backup
 WORKDIR /opt/qbt_migrate
-COPY qbt_migrate qbt_migrate
-COPY pyproject.toml pyproject.toml
-COPY LICENSE.md LICENSE.md
-COPY README.md README.md
+COPY . .
 RUN pip install flit
 ENV FLIT_ROOT_INSTALL=1
 RUN flit install --symlink --deps production
