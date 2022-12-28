@@ -129,4 +129,5 @@ dmypy.json
 # Project files
 *.zip
 *.fastresume
+user_files/
 !tests/test_files/**
