@@ -1,0 +1,11 @@
+# Ignore everything
+*
+
+# Copy these files/folders
+!qbt_migrate/
+!pyproject.toml
+!LICENSE.md
+!README.md
+
+# Ignore bytecode
+**/*.pyc
