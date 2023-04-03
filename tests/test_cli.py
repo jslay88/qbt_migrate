@@ -42,7 +42,15 @@ def test_parse_args_defaults():
     args = parse_args([])
     assert all(
         hasattr(args, key)
-        for key in ["existing_path", "new_path", "regex", "target_os", "bt_backup_path", "skip_bad_files", "log_level"]
+        for key in [
+            "existing_path",
+            "new_path",
+            "regex",
+            "target_os",
+            "bt_backup_path",
+            "skip_bad_files",
+            "log_level",
+        ]
     )
     assert args.existing_path is None
     assert args.new_path is None
@@ -56,7 +64,20 @@ def test_parse_args_defaults():
 def test_parse_args_shorthand():
     # Check shorthand values
     args = parse_args(
-        ["-e", "existing-path", "-n", "new-path", "-r", "-t", "Linux", "-b", "bt-backup-path", "-s", "-l", "DEBUG"]
+        [
+            "-e",
+            "existing-path",
+            "-n",
+            "new-path",
+            "-r",
+            "-t",
+            "Linux",
+            "-b",
+            "bt-backup-path",
+            "-s",
+            "-l",
+            "DEBUG",
+        ]
     )
     assert args.existing_path == "existing-path"
     assert args.new_path == "new-path"
@@ -117,7 +138,9 @@ def test_main_version_check(monkeypatch):
 
 
 def test_main_with_inputs(monkeypatch):
-    mock_user_input = MockUserInput(["bt-backup-path", "existing-path", "new-path", "no", "windows"])
+    mock_user_input = MockUserInput(
+        ["bt-backup-path", "existing-path", "new-path", "no", "windows"]
+    )
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
     monkeypatch.setattr("qbt_migrate.cli.QBTBatchMove", MockQBTBatchMove)
     monkeypatch.setattr("sys.argv", ["qbt_migrate"])
@@ -151,7 +174,9 @@ def test_main_with_args(monkeypatch):
         ],
     )
     main()
-    assert MockQBTBatchMove.instance.bt_backup_path == Path("different-bt-backup-path")
+    assert MockQBTBatchMove.instance.bt_backup_path == Path(
+        "different-bt-backup-path"
+    )
     assert len(MockQBTBatchMove.run_call[0]) == 6
     assert MockQBTBatchMove.run_call[0][0] == "different-existing-path"
     assert MockQBTBatchMove.run_call[0][1] == "different-new-path"
@@ -163,8 +188,22 @@ def test_main_with_args(monkeypatch):
 
 def test_main_invalid_input_loops(monkeypatch):
     monkeypatch.setattr("qbt_migrate.cli.QBTBatchMove", MockQBTBatchMove)
-    monkeypatch.setattr("sys.argv", ["qbt_migrate", "-b", "backup-path", "-e", "e-path", "-n", "n-path", "-s"])
-    mock_user_input = MockUserInput(["not-valid", "yes", "not-valid", "windows"])
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "qbt_migrate",
+            "-b",
+            "backup-path",
+            "-e",
+            "e-path",
+            "-n",
+            "n-path",
+            "-s",
+        ],
+    )
+    mock_user_input = MockUserInput(
+        ["not-valid", "yes", "not-valid", "windows"]
+    )
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
     main()
     assert MockQBTBatchMove.instance.bt_backup_path == Path("backup-path")
@@ -181,19 +220,25 @@ def test_main_target_os_auto_detect(monkeypatch):
     monkeypatch.setattr("qbt_migrate.cli.QBTBatchMove", MockQBTBatchMove)
 
     # Test no OS change
-    mock_user_input = MockUserInput(["bt-backup-path", "existing-path", "new-path", "no", ""])
+    mock_user_input = MockUserInput(
+        ["bt-backup-path", "existing-path", "new-path", "no", ""]
+    )
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
     main()
     assert MockQBTBatchMove.run_call[0][3] is None
 
     # Test Windows to Linux
-    mock_user_input = MockUserInput(["bt-backup-path", "C:\\existing\\path", "/new/path", "no", ""])
+    mock_user_input = MockUserInput(
+        ["bt-backup-path", "C:\\existing\\path", "/new/path", "no", ""]
+    )
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
     main()
     assert MockQBTBatchMove.run_call[0][3] is TargetOS.POSIX
 
     # Test Linux to Windows
-    mock_user_input = MockUserInput(["bt-backup-path", "/existing/path", "C:\\new\\path", "no", ""])
+    mock_user_input = MockUserInput(
+        ["bt-backup-path", "/existing/path", "C:\\new\\path", "no", ""]
+    )
     monkeypatch.setattr("builtins.input", lambda _: mock_user_input.next())
     main()
     assert MockQBTBatchMove.run_call[0][3] is TargetOS.WINDOWS
