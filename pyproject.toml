@@ -35,13 +35,14 @@ dynamic = [
 
 [project.optional-dependencies]
 dev = [
+    "bandit",
     "black",
     "coverage",
     "diff-cover",
-    "flake8",
     "isort",
     "pre-commit",
     "pytest>=2.7.3",
+    "ruff",
 ]
 test = [
     "tox",
@@ -53,13 +54,32 @@ Source = "https://github.com/jslay88/qbt_migrate"
 [project.scripts]
 qbt_migrate = "qbt_migrate.cli:main"
 
+[tool.bandit]
+exclude_dirs = [
+    "tests",
+]
+
 [tool.black]
-line-length = 120
-target-version = ['py39']
+line-length = 79
+target-version = ['py311']
 include = '\.pyi?$'
 
 [tool.isort]
 profile = "black"
-line_length = 120
+line_length = 79
 lines_after_imports = 2
 skip = [".tox", "venv"]
+
+[tool.ruff]
+exclude = [
+    "venv",
+    "__init__.py",
+]
+line-length = 79
+select = [
+    "B",
+    "C",
+    "E",
+    "F",
+    "W",
+]

@@ -8,7 +8,11 @@ import pytest
 
 from qbt_migrate.enums import TargetOS
 from qbt_migrate.methods import Path as methods_Path
-from qbt_migrate.methods import backup_folder, convert_slashes, discover_bt_backup_path
+from qbt_migrate.methods import (
+    backup_folder,
+    convert_slashes,
+    discover_bt_backup_path,
+)
 
 
 def test_backup_folder():
@@ -32,19 +36,28 @@ def test_backup_folder():
 
     # 'test.zip' will fail the filename check in archive if it gets archived
     archive_path = temp_dir / "test.zip"
-    backup_folder(temp_dir, archive_path)  # Call backup_folder with torrent files included
+    backup_folder(
+        temp_dir, archive_path
+    )  # Call backup_folder with torrent files included
 
     # Validate zip file
     with zipfile.ZipFile(archive_path, "r") as archive:
         assert archive.testzip() is None  # Check no errors
         # Assert that it has the correct file count
-        assert len(archive.infolist()) == fastresume_file_count + torrent_file_count
+        assert (
+            len(archive.infolist())
+            == fastresume_file_count + torrent_file_count
+        )
         for file in archive.infolist():
             # Get the integer of the file
-            filename = re.findall(r"test_(\d+).(?:fastresume)?(?:torrent)?", file.filename)
+            filename = re.findall(
+                r"test_(\d+).(?:fastresume)?(?:torrent)?", file.filename
+            )
             assert len(filename) != 0  # Ensure we got the integer
             filename = filename[0]
-            assert archive.read(file.filename) == bytes(f"This is file {filename}", "utf-8")  # Integrity Check
+            assert archive.read(file.filename) == bytes(
+                f"This is file {filename}", "utf-8"
+            )  # Integrity Check
 
     archive_path = temp_dir / "test2.zip"
     backup_folder(temp_dir, archive_path, False)
@@ -59,7 +72,9 @@ def test_backup_folder():
             filename = re.findall(r"test_(\d+).fastresume", file.filename)
             assert len(filename) != 0  # Ensure we got the integer
             filename = filename[0]
-            assert archive.read(file.filename) == bytes(f"This is file {filename}", "utf-8")  # Integrity Check
+            assert archive.read(file.filename) == bytes(
+                f"This is file {filename}", "utf-8"
+            )  # Integrity Check
 
 
 @pytest.mark.parametrize(
@@ -88,11 +103,17 @@ def test_convert_slashes(path: str, target_os: TargetOS, expected_path: str):
             Path("C:\\Users\\test\\AppData\\Local", "qBittorrent\\BT_backup"),
             {"localappdata": "C:\\Users\\test\\AppData\\Local"},
         ),
-        ("linux", Path("/home/test", ".local/share/data/qBittorrent/BT_backup"), {"HOME": "/home/test"}),
+        (
+            "linux",
+            Path("/home/test", ".local/share/data/qBittorrent/BT_backup"),
+            {"HOME": "/home/test"},
+        ),
         ("docker", Path("/config/qBittorrent/BT_backup"), {}),
     ],
 )
-def test_discover_bt_backup_path(monkeypatch, system: str, expected_path: str, envvar_overrides: dict):
+def test_discover_bt_backup_path(
+    monkeypatch, system: str, expected_path: str, envvar_overrides: dict
+):
     for env, val in envvar_overrides.items():
         monkeypatch.setenv(env, val)
     if system == "docker":
