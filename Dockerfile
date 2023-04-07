@@ -1,5 +1,6 @@
 ARG PYTHON_VERSION="3.11"
 FROM python:${PYTHON_VERSION}-alpine
+ENV PIP_NO_CACHE_DIR=1
 ENV BT_BACKUP_PATH=/tmp/BT_backup
 WORKDIR /opt/qbt_migrate
 COPY . .
