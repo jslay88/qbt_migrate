@@ -2,8 +2,8 @@
 import logging
 import os
 
-from .classes import FastResume, QBTBatchMove
-from .methods import convert_slashes, discover_bt_backup_path
+from qbt_migrate.classes import FastResume, QBTBatchMove
+from qbt_migrate.methods import convert_slashes, discover_bt_backup_path
 
 
 __version__ = "2.3.2" + os.getenv("VERSION_TAG", "")

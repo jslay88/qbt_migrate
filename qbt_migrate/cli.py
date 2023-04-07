@@ -3,8 +3,8 @@ import logging
 import sys
 from pathlib import Path
 
-from . import QBTBatchMove, __version__, discover_bt_backup_path
-from .enums import TargetOS
+from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
+from qbt_migrate.enums import TargetOS
 
 
 logger = logging.getLogger(__name__)

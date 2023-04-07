@@ -5,7 +5,7 @@ import zipfile
 from pathlib import Path
 from typing import Union
 
-from .enums import TargetOS
+from qbt_migrate.enums import TargetOS
 
 
 logger = logging.getLogger(__name__)

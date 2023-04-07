@@ -8,8 +8,12 @@ from typing import Optional, Union
 import bencodepy
 from bencodepy.exceptions import BencodeDecodeError
 
-from .enums import TargetOS
-from .methods import backup_folder, convert_slashes, discover_bt_backup_path
+from qbt_migrate.enums import TargetOS
+from qbt_migrate.methods import (
+    backup_folder,
+    convert_slashes,
+    discover_bt_backup_path,
+)
 
 
 logger = logging.getLogger(__name__)
