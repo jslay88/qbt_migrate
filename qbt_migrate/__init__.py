@@ -11,7 +11,7 @@ from qbt_migrate.plans import MigrationPlan, PathChange, PlanSummary
 # Must stay a plain string literal so flit can read it without importing the
 # package. Pre-release builds rewrite this line rather than appending at import
 # time; see the TestPyPI step in .github/workflows/python.yml.
-__version__ = "3.2.0"
+__version__ = "3.3.0"
 
 __all__ = [
     "FastResume",
