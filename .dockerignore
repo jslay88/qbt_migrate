@@ -3,9 +3,11 @@
 
 # Copy these files/folders
 !qbt_migrate/
+!docker-entrypoint.sh
 !pyproject.toml
 !LICENSE.md
 !README.md
 
 # Ignore bytecode
 **/*.pyc
+**/__pycache__/

@@ -1,39 +1,70 @@
-# Builds and Pushes Docker image for PRs with label `pr-docker-build` to GHCR only.
+# Builds the Docker image for every pull request, and additionally pushes it to
+# GHCR for PRs labelled `pr-docker-build`.
 name: Docker Build and Push - PRs
 
 on:
   pull_request:
     types: [ opened, reopened, synchronize, labeled ]
 
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  push:
-    name: Build and Push Docker Image
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'pr-docker-build') }}
+  build:
+    name: Build Docker Image
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-      contents: read
 
     steps:
       - uses: actions/checkout@v7
 
-      - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag $(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,') --label "runnumber=${GITHUB_RUN_ID}" --label "gitsha=${{ github.sha }}"
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
 
+      # Fork pull requests have no write token, so pushing is gated on the PR
+      # coming from this repository. The build itself always runs, so a broken
+      # Dockerfile is caught either way.
       - name: GitHub Container Registry Login
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        if: |
+          contains(github.event.pull_request.labels.*.name, 'pr-docker-build')
+          && github.event.pull_request.head.repo.full_name == github.repository
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push Docker Image to GHCR
-        env:
-          HEAD_REF: ${{ github.head_ref }}
+      - name: Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=pr
+
+      - name: Build and Push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ contains(github.event.pull_request.labels.*.name, 'pr-docker-build') && github.event.pull_request.head.repo.full_name == github.repository }}
+          load: ${{ !contains(github.event.pull_request.labels.*.name, 'pr-docker-build') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Cheap smoke test so a PR cannot ship an image that fails to start.
+      - name: Smoke Test
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'pr-docker-build') }}
         run: |
-          IMAGE_NAME=$(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,')
-          IMAGE_ID=ghcr.io/${{ github.repository }}
-          # Change all uppercase to lowercase
-          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-          # Lowercase branch name
-          VERSION=$(echo "$HEAD_REF" | tr '[A-Z]' '[a-z]' | sed -e 's,.*/\(.*\),\1,')
-          echo IMAGE_ID=$IMAGE_ID
-          echo VERSION=$VERSION
-          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:$VERSION
+          mkdir -p /tmp/bt_backup
+          docker run --rm --entrypoint qbt_migrate \
+            "$(echo '${{ steps.meta.outputs.tags }}' | head -n1)" --version
+          docker run --rm -v /tmp/bt_backup:/tmp/BT_backup \
+            "$(echo '${{ steps.meta.outputs.tags }}' | head -n1)" \
+            -e /old -n '/new path/with spaces' -t Linux

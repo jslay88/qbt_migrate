@@ -1,5 +1,6 @@
-# Builds and Pushes Docker images for `latest` and semantic versioned tags or "releases".
-# Runs on pushes to master for `latest`, and semantic versioned tags for "releases"
+# Builds and pushes multi-arch Docker images to GHCR and Docker Hub.
+# Runs on pushes to master (tagged `master`) and semantic version tags
+# (tagged `X.Y.Z`, `X.Y`, and `latest`).
 name: Docker Build and Push
 
 on:
@@ -9,41 +10,63 @@ on:
     tags:
       - "*.*.*"
 
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-      contents: read
 
     steps:
       - uses: actions/checkout@v7
 
-      - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag $(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,') --label "runnumber=${GITHUB_RUN_ID}" --label "gitsha=${{ github.sha }}"
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: GitHub Container Registry Login
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: DockerHub Container Registry Login
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+      - name: DockerHub Login
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push Docker Image to GHCR and DockerHub
-        run: |
-          IMAGE_NAME=$(echo "${{ github.repository }}" | sed -e 's,.*/\(.*\),\1,')
-          IMAGE_ID=ghcr.io/${{ github.repository }}
-          # Change all uppercase to lowercase
-          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-          # Strip git ref prefix from version
-          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-          # Strip "v" prefix from tag name if exists
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-          # Use Docker `latest` convention
-          [ "$VERSION" == "master" ] && VERSION=latest
-          echo IMAGE_ID=$IMAGE_ID
-          echo VERSION=$VERSION
-          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:$VERSION
-          docker tag $IMAGE_NAME ${{ github.repository }}:$VERSION
-          docker push ${{ github.repository }}:$VERSION
+      - name: Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+            ${{ github.repository }}
+          # `latest` only moves on a release tag. It used to be overwritten by
+          # every push to master, so `latest` was unreleased code.
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
