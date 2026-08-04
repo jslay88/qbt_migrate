@@ -76,6 +76,22 @@ qbt_migrate -r -e 'X:\\\\(\w+)' -n '/mnt/x/\1'
 Capture groups are recommended so you are not throwing away the rest of the
 path.
 
+## Check first
+
+`--dry-run` prints what each key would become, per file, and writes nothing. Use
+it whenever you are unsure about a pattern, particularly the trailing separator:
+
+```
+$ qbt_migrate -e 'X:\' -n /torrents --dry-run
+    save_path         'X:\Torrents\movie' -> '/torrentsTorrents/movie'
+
+$ qbt_migrate -e 'X:\' -n /torrents/ --dry-run
+    save_path         'X:\Torrents\movie' -> '/torrents/Torrents/movie'
+```
+
+The values are quoted so you can see leading and trailing separators, which is
+where this usually goes wrong.
+
 ## Before you run it
 
 * Fully exit qBittorrent. `File` -> `Exit`, the tray icon, or the task manager.

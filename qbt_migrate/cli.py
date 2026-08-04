@@ -8,6 +8,7 @@ from bencodepy.exceptions import BencodeDecodeError
 from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
 from qbt_migrate.enums import TargetOS
 from qbt_migrate.exceptions import FastResumeUpdateError
+from qbt_migrate.plans import MigrationPlan, PlanSummary
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,14 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-d",
+        "--dry-run",
+        help="Show what would change and exit without writing anything.",
+        action="store_true",
+        default=False,
+    )
+
+    parser.add_argument(
         "-z",
         "--skip-backup",
         help="Skips creating a backup zip archive of the BT_backup folder. "
@@ -82,6 +91,17 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
 
     return parser.parse_args(args)
 
+
+BAD_FILE_HINT = (
+    "❌ Could not read a .fastresume file: {error}\n"
+    "Nothing was changed. Re-run with -s/--skip-bad-files to skip unreadable "
+    "files and migrate the rest."
+)
+
+BAD_BACKUP_PATH_HINT = (
+    "❌ BT_backup path is not a directory: {error}\n"
+    "Point -b/--bt-backup-path at your qBittorrent BT_backup folder."
+)
 
 INTERACTIVE_ONLY_HINT = (
     "Nothing is attached to stdin, so there is nobody to prompt. "
@@ -117,6 +137,63 @@ def prompt_until(
     while (answer := input(message).lower().strip()) not in valid:
         print(retry)
     return answer
+
+
+# Beyond this many files a full listing is unreadable, and libraries of tens of
+# thousands of torrents are the normal case for this tool.
+DRY_RUN_DETAIL_LIMIT = 20
+
+
+def quoted(value: str) -> str:
+    """Wrap a path in quotes so leading and trailing separators are visible.
+
+    Deliberately not `repr`, which escapes backslashes and would render
+    `S:\\Pictures\\` as `S:\\\\Pictures\\\\`. Separator confusion is already
+    this tool's most common support question without inventing more of it.
+    """
+    return f"'{value}'"
+
+
+def log_plan(plan: MigrationPlan) -> None:
+    """Log one file's changes, values quoted so separators are visible."""
+    logger.info(f"{plan.file_path.name}")
+    if plan.error is not None:
+        logger.info(f"    would fail: {plan.error}")
+        return
+    for change in plan.changes:
+        arrow = f"{quoted(change.old)} -> {quoted(change.new)}"
+        if change.is_list:
+            logger.info(
+                f"    {change.key:16}  {change.changed_entries} of "
+                f"{change.total_entries} entries, e.g. {arrow}"
+            )
+        else:
+            logger.info(f"    {change.key:16}  {arrow}")
+
+
+def log_plan_summary(summary: PlanSummary, verbose: bool) -> None:
+    changing = summary.changing
+    shown = changing if verbose else changing[:DRY_RUN_DETAIL_LIMIT]
+    for plan in shown:
+        log_plan(plan)
+    if len(changing) > len(shown):
+        logger.info(
+            f"... and {len(changing) - len(shown)} more. "
+            f"Re-run with -l DEBUG to list every file."
+        )
+
+    for plan in summary.failing:
+        log_plan(plan)
+
+    unchanged = summary.discovered - len(changing) - len(summary.failing)
+    logger.info(
+        f"{'🔍' if changing else '⚠️'} "
+        f"{len(changing)} of {summary.discovered} relevant fastresume "
+        f"file{'' if summary.discovered == 1 else 's'} would be updated"
+        f"{f', {unchanged} already match' if unchanged else ''}"
+        f"{f', {len(summary.failing)} would fail' if summary.failing else ''}."
+        f" Nothing was written."
+    )
 
 
 def configure_logging(log_level: str) -> None:
@@ -181,6 +258,58 @@ def resolve_target_os(
     return None
 
 
+def preview_migration(
+    qbm: QBTBatchMove, args: argparse.Namespace
+) -> int | None:
+    try:
+        summary = qbm.plan(
+            args.existing_path,
+            args.new_path,
+            args.regex,
+            args.target_os,
+            args.skip_bad_files,
+        )
+    except (BencodeDecodeError, ValueError) as e:
+        logger.error(BAD_FILE_HINT.format(error=e))
+        return 1
+    except NotADirectoryError as e:
+        logger.error(BAD_BACKUP_PATH_HINT.format(error=e))
+        return 2
+    log_plan_summary(summary, verbose=args.log_level == "DEBUG")
+    return None
+
+
+def apply_migration(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
+    if args.skip_backup:
+        logger.warning(
+            "⚠️ Skipping the backup archive. Make sure you have one already."
+        )
+    try:
+        qbm.run(
+            args.existing_path,
+            args.new_path,
+            args.regex,
+            args.target_os,
+            not args.skip_backup,
+            args.skip_bad_files,
+        )
+    except (BencodeDecodeError, ValueError) as e:
+        logger.error(BAD_FILE_HINT.format(error=e))
+        return 1
+    except NotADirectoryError as e:
+        logger.error(BAD_BACKUP_PATH_HINT.format(error=e))
+        return 2
+    except FastResumeUpdateError as e:
+        logger.error(
+            f"❌ {len(e.failures)} file(s) were not updated. "
+            f"qBittorrent will still have the old paths for them. "
+            f"Restore from the backup archive in the BT_backup directory "
+            f"if you need to start over."
+        )
+        return 1
+    return None
+
+
 def main() -> int | None:
     args = parse_args(sys.argv[1:])
     configure_logging(args.log_level)
@@ -214,43 +343,11 @@ def main() -> int | None:
     logger.debug(
         f"Existing Path: {args.existing_path}, New Path: {args.new_path}, "
         f"Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}, "
-        f"Skip Backup: {args.skip_backup}"
+        f"Skip Backup: {args.skip_backup}, Dry Run: {args.dry_run}"
     )
-    if args.skip_backup:
-        logger.warning(
-            "⚠️ Skipping the backup archive. Make sure you have one already."
-        )
-    try:
-        qbm.run(
-            args.existing_path,
-            args.new_path,
-            args.regex,
-            args.target_os,
-            not args.skip_backup,
-            args.skip_bad_files,
-        )
-    except (BencodeDecodeError, ValueError) as e:
-        logger.error(
-            f"❌ Could not read a .fastresume file: {e}\n"
-            f"Nothing was changed. Re-run with -s/--skip-bad-files to skip "
-            f"unreadable files and migrate the rest."
-        )
-        return 1
-    except NotADirectoryError as e:
-        logger.error(
-            f"❌ BT_backup path is not a directory: {e}\n"
-            f"Point -b/--bt-backup-path at your qBittorrent BT_backup folder."
-        )
-        return 2
-    except FastResumeUpdateError as e:
-        logger.error(
-            f"❌ {len(e.failures)} file(s) were not updated. "
-            f"qBittorrent will still have the old paths for them. "
-            f"Restore from the backup archive in the BT_backup directory "
-            f"if you need to start over."
-        )
-        return 1
-    return None
+    if args.dry_run:
+        return preview_migration(qbm, args)
+    return apply_migration(qbm, args)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import logging
 import re
 from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from copy import copy, deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -18,6 +19,7 @@ from qbt_migrate.methods import (
     matches_path,
     replace_path,
 )
+from qbt_migrate.plans import MigrationPlan, PlanSummary, diff_data
 
 
 logger = logging.getLogger(__name__)
@@ -121,6 +123,54 @@ class QBTBatchMove:
         )
         if failures:
             raise FastResumeUpdateError(failures)
+
+    def plan(
+        self,
+        existing_path: str,
+        new_path: str,
+        regex_path: bool = False,
+        target_os: TargetOS | None = None,
+        skip_bad_files: bool = False,
+    ) -> PlanSummary:
+        """Work out what `run` would change, writing nothing.
+
+        Same arguments as `run` minus the ones that only matter when writing,
+        so a dry run and the real thing cannot be given different inputs.
+
+        :raises NotADirectoryError: If the BT_backup path is not a directory.
+        """
+        if not self.bt_backup_path.is_dir():
+            raise NotADirectoryError(self.bt_backup_path)
+
+        self.logger.info(
+            f"🔍 Dry run. Searching for .fastresume files with path "
+            f"{existing_path} ..."
+        )
+        summary = PlanSummary()
+        for fast_resume in self.discover_relevant_fast_resume(
+            self.bt_backup_path,
+            existing_path,
+            regex_path,
+            not skip_bad_files,
+        ):
+            try:
+                summary.plans.append(
+                    fast_resume.plan_paths(
+                        existing_path, new_path, regex_path, target_os
+                    )
+                )
+            except Exception as e:  # noqa: BLE001
+                # Surfaced rather than raised: knowing which files would fail
+                # is the whole point of asking first.
+                self.logger.error(
+                    f"🛑 {fast_resume.file_path} would fail to update: {e}"
+                )
+                summary.plans.append(
+                    MigrationPlan(
+                        file_path=fast_resume.file_path, error=str(e)
+                    )
+                )
+        return summary
 
     @classmethod
     def discover_relevant_fast_resume(
@@ -360,6 +410,36 @@ class FastResume:
             file_name = self.file_path
         self.logger.debug(f"Saving File {file_name}...")
         bencode.write(self._data, file_name)
+
+    def plan_paths(
+        self,
+        existing_path: str,
+        new_path: str,
+        regex_path: bool = False,
+        target_os: TargetOS | None = None,
+    ) -> MigrationPlan:
+        """What `replace_paths` would change here, without changing anything.
+
+        Runs the real replacement against an in-memory copy and diffs the
+        result, rather than reimplementing the rules. A preview that predicts
+        its own answer can drift from what an apply does, and a preview that
+        lies is worse than no preview.
+
+        :raises ValueError: If the resulting save path would be empty, the same
+        as `replace_paths` would.
+        """
+        probe = copy(self)
+        probe._data = deepcopy(self._data)
+        # save_file and create_backup are both off, so nothing touches disk.
+        probe.replace_paths(
+            existing_path,
+            new_path,
+            regex_path,
+            target_os,
+            save_file=False,
+            create_backup=False,
+        )
+        return diff_data(self.file_path, self._data, probe._data)
 
     def replace_paths(
         self,
