@@ -100,8 +100,10 @@ def test_convert_slashes(path: str, target_os: TargetOS, expected_path: str):
     [
         (
             "win32",
-            Path("C:\\Users\\test\\AppData\\Local", "qBittorrent\\BT_backup"),
-            {"localappdata": "C:\\Users\\test\\AppData\\Local"},
+            Path("C:\\Users\\test\\AppData\\Local")
+            / "qBittorrent"
+            / "BT_backup",
+            {"LOCALAPPDATA": "C:\\Users\\test\\AppData\\Local"},
         ),
         (
             "linux",

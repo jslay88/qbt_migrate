@@ -287,7 +287,7 @@ class FastResume:
 
     def set_save_paths(
         self,
-        path: str,
+        path: str | None,
         qbt_path: str | None = None,
         qbt_download_path: str | None = None,
         target_os: TargetOS | None = None,
@@ -301,10 +301,14 @@ class FastResume:
         self.logger.debug(f"target_os: {target_os}")
         self.logger.debug(f"save_file: {save_file}")
         self.logger.debug(f"create_backup: {create_backup}")
+        # Validate before writing the backup, so a rejected call does not leave
+        # a stray .bkup behind.
+        if path is None or not path.strip():
+            raise ValueError(
+                f"Cannot set an empty save path on {self.file_path}"
+            )
         if create_backup:
             self.save(self.backup_filename)
-        if not path.strip():
-            raise ValueError("Cannot set empty paths!")
         self.set_save_path(
             path,
             key="save_path",
@@ -329,9 +333,13 @@ class FastResume:
                 save_file=False,
                 create_backup=False,
             )
-        elif self.qbt_download_path:
+        elif self.qbt_download_path and target_os is not None:
+            # No replacement was computed for this key, but a target OS change
+            # still has to normalize its separators. It must never be
+            # overwritten with the save path: it is the incomplete-downloads
+            # directory and is frequently a deliberately different location.
             self.set_save_path(
-                self.qbt_save_path,
+                self.qbt_download_path,
                 key="qBt-downloadPath",
                 target_os=target_os,
                 save_file=False,
@@ -418,7 +426,7 @@ class FastResume:
             f"Replaced Save Path: {new_save_path}"
         )
         self.set_save_paths(
-            path=str(new_save_path),
+            path=new_save_path,
             qbt_path=new_qbt_save_path,
             qbt_download_path=new_qbt_download_path,
             target_os=target_os,

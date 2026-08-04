@@ -19,12 +19,16 @@ def backup_folder(
     folder_path = Path(folder_path)
     archive_path = Path(archive_path)
     with zipfile.ZipFile(archive_path, "w") as archive:
-        for file in folder_path.iterdir():
+        for file in sorted(folder_path.iterdir()):
             if file.name.endswith(".fastresume") or (
                 include_torrents and file.name.endswith(".torrent")
             ):
                 logger.debug(f"Archiving {file} into {archive_path}...")
-                archive.write(file)
+                # Flat entries. Without an arcname, zipfile stores the whole
+                # source path minus the leading separator, so restoring meant
+                # digging the files out of a nested directory tree that
+                # mirrored the machine the backup was taken on.
+                archive.write(file, arcname=file.name)
     logger.info("✔️ Done!")
 
 
@@ -82,7 +86,15 @@ def discover_bt_backup_path():
     logger.debug("Discovering BT_backup path...")
     if sys.platform.startswith("win32"):
         logger.debug("Windows System")
-        return Path(os.getenv("localappdata"), "qBittorrent\\BT_backup")
+        # Path(os.getenv(...), ...) raised TypeError when the variable was
+        # unset, which is easy to hit under service accounts and bare shells.
+        local_app_data = os.getenv("LOCALAPPDATA")
+        base = (
+            Path(local_app_data)
+            if local_app_data
+            else Path.home() / "AppData" / "Local"
+        )
+        return base / "qBittorrent" / "BT_backup"
 
     if (
         Path("/.dockerenv").is_file()
@@ -94,4 +106,4 @@ def discover_bt_backup_path():
         return Path("/config/qBittorrent/BT_backup")
 
     logger.debug("Linux/Mac System")
-    return Path(os.getenv("HOME"), ".local/share/data/qBittorrent/BT_backup")
+    return Path.home() / ".local/share/data/qBittorrent/BT_backup"
