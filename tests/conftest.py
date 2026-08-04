@@ -87,6 +87,19 @@ def linux_env(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
 
 
+@pytest.fixture(autouse=True)
+def no_qbittorrent_running(monkeypatch):
+    """Pretend qBittorrent is not running, for every test.
+
+    Without this, the CLI preflight reads the real process list, so the suite
+    would fail on any developer machine that happens to have qBittorrent open.
+    Tests covering the preflight override it explicitly.
+    """
+    monkeypatch.setattr(
+        "qbt_migrate.cli.find_processes", lambda: [], raising=True
+    )
+
+
 @pytest.fixture
 def interactive_stdin(monkeypatch):
     """Make the CLI believe a human is attached to stdin.

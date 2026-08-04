@@ -9,6 +9,7 @@ from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
 from qbt_migrate.enums import TargetOS
 from qbt_migrate.exceptions import FastResumeUpdateError
 from qbt_migrate.plans import MigrationPlan, PlanSummary
+from qbt_migrate.process import find_processes, stop_processes
 
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,23 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         "--skip-bad-files",
         help="Skips bad .fastresume files instead of exiting. "
         "Default behavior is to exit.",
+        action="store_true",
+        default=False,
+    )
+
+    parser.add_argument(
+        "-k",
+        "--stop-qbittorrent",
+        help="Stop a running qBittorrent without asking first, and wait "
+        "for it to exit.",
+        action="store_true",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--ignore-running",
+        help="Run even if qBittorrent is still running. Unsafe: it will "
+        "overwrite your changes from memory when it exits.",
         action="store_true",
         default=False,
     )
@@ -194,6 +212,62 @@ def log_plan_summary(summary: PlanSummary, verbose: bool) -> None:
         f"{f', {len(summary.failing)} would fail' if summary.failing else ''}."
         f" Nothing was written."
     )
+
+
+def preflight_qbittorrent(args: argparse.Namespace) -> int | None:
+    """Refuse to write while qBittorrent is running, and offer to stop it.
+
+    Returns an exit code to bail out with, or None to carry on. Editing
+    `.fastresume` files underneath a running client accomplishes nothing: it
+    rewrites them from memory on exit. Detection is best effort, and finds
+    nothing from inside a container, so this is a safety net rather than a
+    guarantee.
+    """
+    if args.ignore_running:
+        logger.warning(
+            "⚠️ Not checking whether qBittorrent is running. If it is, it will "
+            "overwrite these changes from memory when it exits."
+        )
+        return None
+
+    running = find_processes()
+    if not running:
+        logger.debug("No running qBittorrent found.")
+        return None
+
+    listed = ", ".join(str(process) for process in running)
+    logger.warning(f"⚠️ qBittorrent is running: {listed}")
+
+    if not args.stop_qbittorrent:
+        if not is_interactive():
+            logger.error(
+                "❌ Refusing to run while qBittorrent is running. It would "
+                "overwrite these changes from memory when it exits.\n"
+                "Pass -k/--stop-qbittorrent to stop it first, or "
+                "--ignore-running to override."
+            )
+            return 2
+        answer = prompt_until(
+            "Stop it now and wait for it to exit? [Y/n]: ",
+            ("y", "yes", "n", "no", ""),
+            "Please answer y, n, yes, or no",
+        )
+        if answer in ("n", "no"):
+            logger.error(
+                "❌ Nothing was changed. Close qBittorrent and run again."
+            )
+            return 2
+
+    still_running = stop_processes(running)
+    if still_running:
+        listed = ", ".join(str(process) for process in still_running)
+        logger.error(
+            f"❌ qBittorrent did not exit: {listed}\n"
+            f"Nothing was changed. Quit it manually through File -> Exit, "
+            f"wait for the window to disappear, then run again."
+        )
+        return 2
+    return None
 
 
 def configure_logging(log_level: str) -> None:
@@ -345,8 +419,14 @@ def main() -> int | None:
         f"Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}, "
         f"Skip Backup: {args.skip_backup}, Dry Run: {args.dry_run}"
     )
+    # A dry run writes nothing, so it is safe with qBittorrent open and is the
+    # obvious thing to reach for while deciding on a pattern.
     if args.dry_run:
         return preview_migration(qbm, args)
+
+    bail = preflight_qbittorrent(args)
+    if bail is not None:
+        return bail
     return apply_migration(qbm, args)
 
 
