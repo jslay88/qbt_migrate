@@ -14,7 +14,7 @@ def backup_folder(
     folder_path: str | Path,
     archive_path: str | Path,
     include_torrents: bool = True,
-):
+) -> None:
     logger.info(f"🗄️ Creating Archive {archive_path} ...")
     folder_path = Path(folder_path)
     archive_path = Path(archive_path)
@@ -32,7 +32,7 @@ def backup_folder(
     logger.info("✔️ Done!")
 
 
-def convert_slashes(path: str, target_os: TargetOS):
+def convert_slashes(path: str, target_os: TargetOS) -> str:
     if not isinstance(target_os, TargetOS):
         raise ValueError(
             f"Target OS is not valid. Must be enum TargetOs. "

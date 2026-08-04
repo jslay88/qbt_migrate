@@ -13,6 +13,12 @@ repos:
       - id: ruff-check
         args: [ --fix ]
       - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [ 'bencode.py>=4.0,<5' ]
+        pass_filenames: false
   - repo: https://github.com/PyCQA/bandit
     rev: 1.9.4
     hooks:

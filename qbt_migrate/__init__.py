@@ -12,4 +12,13 @@ from qbt_migrate.methods import convert_slashes, discover_bt_backup_path
 # time; see the TestPyPI step in .github/workflows/python.yml.
 __version__ = "2.3.2"
 
+__all__ = [
+    "FastResume",
+    "FastResumeUpdateError",
+    "QBTBatchMove",
+    "QBTMigrateError",
+    "convert_slashes",
+    "discover_bt_backup_path",
+]
+
 logging.getLogger(__name__).addHandler(logging.NullHandler())

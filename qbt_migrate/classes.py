@@ -1,8 +1,10 @@
 import logging
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Iterator
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 import bencodepy
 from bencodepy.exceptions import BencodeDecodeError
@@ -25,12 +27,12 @@ bencode = bencodepy.Bencode(encoding="utf-8", encoding_fallback="all")
 class QBTBatchMove:
     logger = logging.getLogger(__name__ + ".QBTBatchMove")
 
-    def __init__(self, bt_backup_path: str = None):
+    def __init__(self, bt_backup_path: str | Path | None = None):
         if bt_backup_path is None:
             bt_backup_path = discover_bt_backup_path()
         self.logger.debug(f"BT_backup Path: {bt_backup_path}")
         self.bt_backup_path = Path(bt_backup_path)
-        self.discovered_files = set()
+        self.discovered_files: set[FastResume] = set()
 
     def run(
         self,
@@ -41,7 +43,7 @@ class QBTBatchMove:
         create_backup: bool = True,
         skip_bad_files: bool = False,
         max_workers: int | None = None,
-    ):
+    ) -> None:
         """
         Perform Batch Processing of path changes.
         :param existing_path: Existing path to look for
@@ -81,7 +83,7 @@ class QBTBatchMove:
         failures: dict[Path, BaseException] = {}
         count = 0
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {}
+            futures: dict[Future[None], FastResume] = {}
             for fast_resume in self.discover_relevant_fast_resume(
                 self.bt_backup_path,
                 existing_path,
@@ -127,7 +129,7 @@ class QBTBatchMove:
         existing_path: str,
         regex_path: bool = False,
         raise_on_error: bool = True,
-    ):
+    ) -> Iterator["FastResume"]:
         """
         Find .fastresume files that contain the existing path.
         :param bt_backup_path: Path to BT_backup folder
@@ -192,8 +194,10 @@ class QBTBatchMove:
         return
 
     @classmethod
-    def backup_folder(cls, folder_path: str | Path, archive_path: str | Path):
-        return backup_folder(folder_path, archive_path)
+    def backup_folder(
+        cls, folder_path: str | Path, archive_path: str | Path
+    ) -> None:
+        backup_folder(folder_path, archive_path)
 
     @classmethod
     def update_fastresume(
@@ -205,7 +209,7 @@ class QBTBatchMove:
         target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
-    ):
+    ) -> None:
         if not isinstance(fast_resume, FastResume):
             raise TypeError("Not a FastResume object, cannot replace paths!")
         fast_resume.replace_paths(
@@ -221,12 +225,14 @@ class QBTBatchMove:
 class FastResume:
     logger = logging.getLogger(__name__ + ".FastResume")
 
-    def __init__(self, file_path: str | Path):
+    def __init__(self, file_path: str | Path) -> None:
         self._file_path = Path(file_path)
         if not self.file_path.is_file():
             raise FileNotFoundError(self.file_path)
         self.logger.debug(f"Loading Fast Resume: {self.file_path}")
-        self._data = bencode.read(self.file_path)
+        # Bencode is schemaless, so everything read out of it is Any. The
+        # property accessors below are where we assert what we expect.
+        self._data: dict[str, Any] = bencode.read(self.file_path)
         self.logger.debug(f"Fast Resume ({self.file_path}) Init Complete.")
 
     @property
@@ -241,23 +247,19 @@ class FastResume:
 
     @property
     def save_path(self) -> str | None:
-        if "save_path" in self._data:
-            return self._data["save_path"]
+        return cast("str | None", self._data.get("save_path"))
 
     @property
     def qbt_download_path(self) -> str | None:
-        if "qBt-downloadPath" in self._data:
-            return self._data["qBt-downloadPath"]
+        return cast("str | None", self._data.get("qBt-downloadPath"))
 
     @property
     def qbt_save_path(self) -> str | None:
-        if "qBt-savePath" in self._data:
-            return self._data["qBt-savePath"]
+        return cast("str | None", self._data.get("qBt-savePath"))
 
     @property
-    def mapped_files(self):
-        if "mapped_files" in self._data:
-            return self._data["mapped_files"]
+    def mapped_files(self) -> list[str] | None:
+        return cast("list[str] | None", self._data.get("mapped_files"))
 
     def set_save_path(
         self,
@@ -266,7 +268,7 @@ class FastResume:
         target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
-    ):
+    ) -> None:
         if key not in ["save_path", "qBt-savePath", "qBt-downloadPath"]:
             raise KeyError(
                 "When setting a save path, "
@@ -293,7 +295,7 @@ class FastResume:
         target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
-    ):
+    ) -> None:
         self.logger.debug(f"Set Save Paths in {self.file_path}...")
         self.logger.debug(f"path: {path}")
         self.logger.debug(f"qbt_path: {qbt_path}")
@@ -353,7 +355,7 @@ class FastResume:
         if save_file:
             self.save()
 
-    def save(self, file_name: str | Path | None = None):
+    def save(self, file_name: str | Path | None = None) -> None:
         if file_name is None:
             file_name = self.file_path
         self.logger.debug(f"Saving File {file_name}...")
@@ -367,7 +369,7 @@ class FastResume:
         target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
-    ):
+    ) -> None:
         self.logger.debug(f"Replacing Paths in FastResume {self.file_path}...")
         self.logger.debug(f"Existing Path: {existing_path}")
         self.logger.debug(f"New Path: {new_path}")

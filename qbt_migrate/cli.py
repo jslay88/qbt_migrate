@@ -13,7 +13,7 @@ from qbt_migrate.exceptions import FastResumeUpdateError
 logger = logging.getLogger(__name__)
 
 
-def parse_args(args=None):
+def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-e", "--existing-path", help="Existing root of path to look for."
