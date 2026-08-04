@@ -53,7 +53,11 @@ jobs:
         run: tox -e lint
 
   unittest:
-    name: Unit Tests
+    # Named explicitly so the check name stays `Unit Tests (py310-unittest)`.
+    # Left implicit, GitHub derives it from the whole matrix entry, which makes
+    # it `Unit Tests (py310-unittest, 3.10)` and silently breaks the required
+    # status check contexts on master any time the matrix keys change.
+    name: Unit Tests (${{ matrix.toxenv }})
     runs-on: ubuntu-latest
 
     strategy:
