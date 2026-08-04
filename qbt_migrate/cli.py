@@ -3,6 +3,8 @@ import logging
 import sys
 from pathlib import Path
 
+from bencodepy.exceptions import BencodeDecodeError
+
 from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
 from qbt_migrate.enums import TargetOS
 from qbt_migrate.exceptions import FastResumeUpdateError
@@ -72,93 +74,133 @@ def parse_args(args=None):
     return parser.parse_args(args)
 
 
-def main():  # noqa: C901
-    args = parse_args(sys.argv[1:])
+INTERACTIVE_ONLY_HINT = (
+    "Nothing is attached to stdin, so there is nobody to prompt. "
+    "Pass the missing arguments on the command line, or run the container "
+    "with `-it` if you want the prompts."
+)
+
+
+def is_interactive() -> bool:
+    """Is there a human on the other end of stdin?
+
+    Prompting unconditionally is why `docker run` without `-it` died with
+    `EOFError: EOF when reading a line` (#69), and why a fully flagged
+    invocation still blocked: `--regex` and `--target-os` were prompted for
+    even when everything else was supplied.
+    """
+    return sys.stdin is not None and sys.stdin.isatty()
+
+
+def prompt(message: str) -> str | None:
+    """Ask for a value. `None` when running non-interactively."""
+    if not is_interactive():
+        return None
+    return input(message).strip()
+
+
+def prompt_until(
+    message: str, valid: tuple[str, ...], retry: str
+) -> str | None:
+    """Ask until the answer is one of `valid`. `None` when non-interactive."""
+    if not is_interactive():
+        return None
+    while (answer := input(message).lower().strip()) not in valid:
+        print(retry)
+    return answer
+
+
+def configure_logging(log_level: str) -> None:
     fmt = (
         "%(message)s"
-        if args.log_level == "INFO"
+        if log_level == "INFO"
         else "%(asctime)s :: %(levelname)s :: "
         "%(name)s.%(funcName)s: %(message)s"
     )
     logging.basicConfig(format=fmt)
-    logger.setLevel(args.log_level)
-    logging.getLogger("qbt_migrate").setLevel(args.log_level)
+    logger.setLevel(log_level)
+    logging.getLogger("qbt_migrate").setLevel(log_level)
     logging.getLogger("qbt_migrate").propagate = True
+
+
+def resolve_bt_backup_path(bt_backup_path: str | None, default: Path) -> Path:
+    if bt_backup_path is not None:
+        return Path(bt_backup_path.strip())
+    answer = prompt(f"BT_backup Path {default}: ")
+    return Path(answer) if answer else default
+
+
+def resolve_regex(regex: bool | None) -> bool:
+    if regex is not None:
+        return regex
+    answer = prompt_until(
+        "Existing and New paths are regex patterns "
+        "(capture groups recommended)? [y/N]: ",
+        ("y", "yes", "n", "no", ""),
+        "Please answer y, n, yes, or no",
+    )
+    return answer in ("y", "yes")
+
+
+def resolve_target_os(
+    target_os: str | None, existing_path: str, new_path: str
+) -> TargetOS | None:
+    if target_os is None:
+        target_os = prompt_until(
+            "Target OS (Windows, Linux, Mac, Blank for auto-detect): ",
+            ("windows", "linux", "mac", ""),
+            "Please answer Windows, Linux, or Mac",
+        )
+    if target_os:
+        return (
+            TargetOS.WINDOWS
+            if target_os.lower() in TargetOS.WINDOWS.value
+            else TargetOS.POSIX
+        )
+    # Blank, or nobody to ask. Infer from the separators in use.
+    if "/" in existing_path and "\\" in new_path:
+        logger.info(
+            "Auto detected target OS change. Will convert slashes to Windows."
+        )
+        return TargetOS.WINDOWS
+    if "\\" in existing_path and "/" in new_path:
+        logger.info(
+            "Auto detected target OS change. "
+            "Will convert slashes to Linux/Mac."
+        )
+        return TargetOS.POSIX
+    return None
+
+
+def main() -> int | None:
+    args = parse_args(sys.argv[1:])
+    configure_logging(args.log_level)
     if args.version:
         logger.debug("Version Print requested.")
         logger.info(f"{__version__}")
         logger.debug("Exiting")
         return None
+
     qbm = QBTBatchMove()
-    if args.bt_backup_path is not None:
-        qbm.bt_backup_path = Path(args.bt_backup_path.strip())
-    else:
-        bt_backup_path = input(f"BT_backup Path {qbm.bt_backup_path}: ")
-        if bt_backup_path.strip():
-            qbm.bt_backup_path = Path(bt_backup_path.strip())
+    qbm.bt_backup_path = resolve_bt_backup_path(
+        args.bt_backup_path, qbm.bt_backup_path
+    )
     if args.existing_path is None:
-        args.existing_path = input("Existing Path: ")
+        args.existing_path = prompt("Existing Path: ")
     if args.new_path is None:
-        args.new_path = input("New Path: ")
+        args.new_path = prompt("New Path: ")
+    for name, value in (
+        ("--existing-path/-e", args.existing_path),
+        ("--new-path/-n", args.new_path),
+    ):
+        if not value:
+            logger.error(f"❌ {name} is required. {INTERACTIVE_ONLY_HINT}")
+            return 2
 
-    # Get Valid Regex Input
-    if args.regex is None:
-        while (
-            answer := input(
-                "Existing and New paths are regex patterns "
-                "(capture groups recommended)? [y/N]: "
-            )
-            .lower()
-            .strip()
-        ) not in (
-            "y",
-            "yes",
-            "n",
-            "no",
-            "",
-        ):
-            print("Please answer y, n, yes, or no")
-        args.regex = answer.lower().strip() in ["y", "yes"]
-
-    # Get Valid Target OS Input
-    if args.target_os is None:
-        while (
-            answer := input(
-                "Target OS (Windows, Linux, Mac, Blank for auto-detect): "
-            )
-            .lower()
-            .strip()
-        ) not in (
-            "windows",
-            "linux",
-            "mac",
-            "",
-        ):
-            print("Please answer Windows, Linux, or Mac")
-        args.target_os = answer.lower().strip()
-    if args.target_os:
-        args.target_os = (
-            TargetOS.WINDOWS
-            if args.target_os.lower() in TargetOS.WINDOWS.value
-            else TargetOS.POSIX
-        )
-
-    # Handle Target OS Auto-Detect if not specified
-    if not args.target_os:
-        if "/" in args.existing_path and "\\" in args.new_path:
-            logger.info(
-                "Auto detected target OS change. "
-                "Will convert slashes to Windows."
-            )
-            args.target_os = TargetOS.WINDOWS
-        elif "\\" in args.existing_path and "/" in args.new_path:
-            logger.info(
-                "Auto detected target OS change. "
-                "Will convert slashes to Linux/Mac."
-            )
-            args.target_os = TargetOS.POSIX
-        else:
-            args.target_os = None
+    args.regex = resolve_regex(args.regex)
+    args.target_os = resolve_target_os(
+        args.target_os, args.existing_path, args.new_path
+    )
 
     logger.debug(
         f"Existing Path: {args.existing_path}, New Path: {args.new_path}, "
@@ -173,6 +215,19 @@ def main():  # noqa: C901
             True,
             args.skip_bad_files,
         )
+    except (BencodeDecodeError, ValueError) as e:
+        logger.error(
+            f"❌ Could not read a .fastresume file: {e}\n"
+            f"Nothing was changed. Re-run with -s/--skip-bad-files to skip "
+            f"unreadable files and migrate the rest."
+        )
+        return 1
+    except NotADirectoryError as e:
+        logger.error(
+            f"❌ BT_backup path is not a directory: {e}\n"
+            f"Point -b/--bt-backup-path at your qBittorrent BT_backup folder."
+        )
+        return 2
     except FastResumeUpdateError as e:
         logger.error(
             f"❌ {len(e.failures)} file(s) were not updated. "

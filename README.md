@@ -42,6 +42,14 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
                             Log Level, Default is INFO.
       -v, --version         Prints the current version number and exits.
 
+Anything not passed as an argument is prompted for. When nothing is attached to stdin
+(a container without `-it`, cron, a shell script), `qbt_migrate` does not prompt: it uses
+the defaults it can (platform `BT_backup` path, no regex, target OS auto-detected) and
+exits with a message naming the argument if `-e` or `-n` is missing.
+
+Exit codes: `0` success, `1` one or more `.fastresume` files could not be read or updated,
+`2` bad or missing arguments.
+
 By default, everything happens in the BT_backup directory defined by the OS the script is running on.
 Override `BT_backup` path if needed.
 

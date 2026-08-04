@@ -88,6 +88,22 @@ def linux_env(monkeypatch):
 
 
 @pytest.fixture
+def interactive_stdin(monkeypatch):
+    """Make the CLI believe a human is attached to stdin.
+
+    Under pytest stdin is replaced with a non-tty capture object, which is the
+    same situation as `docker run` without `-it`, so prompt-driven tests have
+    to opt back in.
+    """
+
+    class FakeTTY:
+        def isatty(self) -> bool:
+            return True
+
+    monkeypatch.setattr(sys, "stdin", FakeTTY())
+
+
+@pytest.fixture
 def cli_args(monkeypatch):
     """Set `sys.argv` for a `main()` invocation.
 
