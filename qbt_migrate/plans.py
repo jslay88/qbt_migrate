@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from qbt_migrate.names import torrent_name
+
 
 # Keys holding a single path value, in the order they are shown to the user.
 PATH_KEYS = ("save_path", "qBt-savePath", "qBt-downloadPath")
@@ -32,6 +34,9 @@ class MigrationPlan:
 
     file_path: Path
     changes: tuple[PathChange, ...] = ()
+    # The torrent's display name. A .fastresume is named after the 40 character
+    # info hash, which tells nobody which torrent they are looking at.
+    name: str = ""
     # Set when the file was discovered as relevant but could not be planned,
     # so a dry run surfaces failures instead of only successes.
     error: str | None = None
@@ -71,6 +76,7 @@ def diff_data(
     away from what an apply actually does.
     """
     changes = []
+    name = torrent_name(file_path, before)
     for key in PATH_KEYS:
         old, new = before.get(key), after.get(key)
         if old != new and isinstance(new, str):
@@ -80,7 +86,9 @@ def diff_data(
     if list_change is not None:
         changes.append(list_change)
 
-    return MigrationPlan(file_path=file_path, changes=tuple(changes))
+    return MigrationPlan(
+        file_path=file_path, changes=tuple(changes), name=name
+    )
 
 
 def _diff_mapped_files(

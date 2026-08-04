@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Added:
+
+* Torrents are identified by name instead of the 40 character info hash their
+  `.fastresume` is named after, in dry run output and in failure messages. The
+  name is resolved from `qBt-name`, then libtorrent's `name`, then an embedded
+  `info` dictionary, then the sibling `<hash>.torrent` (where qBittorrent
+  actually keeps it), falling back to the hash for a magnet with no metadata yet.
+* `MigrationPlan.name` and `FastResume.name` for library users
+
+A missing or corrupt `.torrent` only costs the nicer label; it never affects a
+migration.
+
 ## 3.2.0 (2026-08-04)
 
 Added:

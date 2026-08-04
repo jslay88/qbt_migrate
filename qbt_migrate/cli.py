@@ -174,7 +174,7 @@ def quoted(value: str) -> str:
 
 def log_plan(plan: MigrationPlan) -> None:
     """Log one file's changes, values quoted so separators are visible."""
-    logger.info(f"{plan.file_path.name}")
+    logger.info(f"{plan.name or plan.file_path.name}")
     if plan.error is not None:
         logger.info(f"    would fail: {plan.error}")
         return
