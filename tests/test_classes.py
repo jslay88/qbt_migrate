@@ -320,7 +320,9 @@ def test_fastresume_set_save_paths(monkeypatch, fastresume_path):
     fast_resume.set_save_paths("/this/is/a/path")
     assert fast_resume.save_path == "/this/is/a/path"
     assert fast_resume.qbt_save_path == "/this/is/a/path"
-    assert fast_resume.qbt_download_path == "/this/is/a/path"
+    # qBt-downloadPath is the incomplete-downloads directory and is not
+    # implied by the save path, so it is left alone when not passed.
+    assert fast_resume.qbt_download_path == "/some/test/path"
     # Test with differing qBt-savePath
     fast_resume.set_save_paths(
         "/this/is/a/path",
