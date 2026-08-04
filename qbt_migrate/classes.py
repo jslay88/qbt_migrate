@@ -12,6 +12,8 @@ from qbt_migrate.methods import (
     backup_folder,
     convert_slashes,
     discover_bt_backup_path,
+    matches_path,
+    replace_path,
 )
 
 
@@ -116,7 +118,9 @@ class QBTBatchMove:
         :rtype: list[FastResume]
         """
         bt_backup_path = Path(bt_backup_path)
-        for file in bt_backup_path.iterdir():
+        # Sorted so processing order (and therefore log output) is reproducible
+        # across runs and filesystems.
+        for file in sorted(bt_backup_path.iterdir()):
             if file.is_dir():
                 continue
             if file.name.endswith(".fastresume"):
@@ -138,10 +142,10 @@ class QBTBatchMove:
                     continue
                 if (
                     fast_resume.save_path is not None
-                    and existing_path in fast_resume.save_path
+                    and matches_path(fast_resume.save_path, existing_path)
                 ) or (
                     fast_resume.qbt_save_path is not None
-                    and existing_path in fast_resume.qbt_save_path
+                    and matches_path(fast_resume.qbt_save_path, existing_path)
                 ):
                     yield fast_resume
                 elif regex_path and (
@@ -359,24 +363,22 @@ class FastResume:
                     pattern.sub(new_path, path) for path in self.mapped_files
                 ]
         else:
+            # Every key is matched the same way. Assuming a separator
+            # convention per key silently skipped the replacement when the
+            # fastresume did not happen to use it, leaving the old drive letter
+            # in place. See #75.
             new_save_path = (
-                self.save_path.replace(existing_path, new_path)
+                replace_path(self.save_path, existing_path, new_path)
                 if self.save_path is not None
                 else None
             )
             new_qbt_save_path = (
-                self.qbt_save_path.replace(
-                    convert_slashes(existing_path, TargetOS.POSIX),
-                    convert_slashes(new_path, TargetOS.POSIX),
-                )
+                replace_path(self.qbt_save_path, existing_path, new_path)
                 if self.qbt_save_path is not None
                 else None
             )
             new_qbt_download_path = (
-                self.qbt_download_path.replace(
-                    convert_slashes(existing_path, TargetOS.POSIX),
-                    convert_slashes(new_path, TargetOS.POSIX),
-                )
+                replace_path(self.qbt_download_path, existing_path, new_path)
                 if self.qbt_download_path is not None
                 else None
             )
@@ -384,7 +386,7 @@ class FastResume:
                 new_save_path = new_qbt_save_path
             if self.mapped_files:
                 self._data["mapped_files"] = [
-                    path.replace(existing_path, new_path)
+                    replace_path(path, existing_path, new_path)
                     for path in self.mapped_files
                 ]
         self.logger.debug(
