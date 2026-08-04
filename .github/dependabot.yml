@@ -8,6 +8,15 @@ updates:
       actions:
         patterns:
           - "*"
+    ignore:
+      # GitHub asks that this one be referenced by major version tag, since
+      # some of its features depend on server-side flags that get removed over
+      # time and pinned older versions silently lose functionality.
+      # https://github.com/github/codeql-action#keeping-the-codeql-action-up-to-date
+      - dependency-name: github/codeql-action
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
     commit-message:
       prefix: "ci"
 
