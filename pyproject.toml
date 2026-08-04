@@ -58,6 +58,18 @@ exclude_dirs = [
     "tests",
 ]
 
+[tool.mypy]
+python_version = "3.10"
+files = [
+    "qbt_migrate",
+]
+strict = true
+
+[[tool.mypy.overrides]]
+# bencode.py ships no type information.
+module = "bencodepy.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = [
