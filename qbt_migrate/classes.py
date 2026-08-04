@@ -62,7 +62,7 @@ class QBTBatchMove(object):
         if create_backup:
             backup_filename = (
                 f"fastresume_backup"
-                f'{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
+                f"{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
             )
             backup_folder(
                 self.bt_backup_path, self.bt_backup_path / backup_filename
@@ -211,7 +211,7 @@ class FastResume(object):
     @property
     def backup_filename(self) -> Path:
         return Path(
-            f'{self.file_path}.{datetime.now().strftime("%Y%m%d%H%M%S")}.bkup'
+            f"{self.file_path}.{datetime.now().strftime('%Y%m%d%H%M%S')}.bkup"
         )
 
     @property

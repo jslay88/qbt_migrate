@@ -1,4 +1,5 @@
 """qBt Migrate, change the paths of existing torrents in qBittorrent, as well as convert paths to Windows/Linux/Mac"""
+
 import logging
 
 from qbt_migrate.classes import FastResume, QBTBatchMove
