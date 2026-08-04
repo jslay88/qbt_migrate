@@ -179,8 +179,9 @@ jobs:
           FLIT_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
           FLIT_INDEX_URL: https://test.pypi.org/legacy/
         run: |
+          sed -i "s/^__version__ = \"\(.*\)\"$/__version__ = \"\1.dev${GITHUB_RUN_ID}\"/" qbt_migrate/__init__.py
           flit install --symlink --deps production
-          export VERSION_TAG=dev${GITHUB_RUN_ID}; flit publish
+          flit publish
 
       - name: Store Python Package as Artifact
         uses: actions/upload-artifact@v2.2.4
