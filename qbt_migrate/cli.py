@@ -5,6 +5,7 @@ from pathlib import Path
 
 from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
 from qbt_migrate.enums import TargetOS
+from qbt_migrate.exceptions import FastResumeUpdateError
 
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ def main():  # noqa: C901
         logger.debug("Version Print requested.")
         logger.info(f"{__version__}")
         logger.debug("Exiting")
-        return
+        return None
     qbm = QBTBatchMove()
     if args.bt_backup_path is not None:
         qbm.bt_backup_path = Path(args.bt_backup_path.strip())
@@ -163,15 +164,25 @@ def main():  # noqa: C901
         f"Existing Path: {args.existing_path}, New Path: {args.new_path}, "
         f"Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}"
     )
-    qbm.run(
-        args.existing_path,
-        args.new_path,
-        args.regex,
-        args.target_os,
-        True,
-        args.skip_bad_files,
-    )
+    try:
+        qbm.run(
+            args.existing_path,
+            args.new_path,
+            args.regex,
+            args.target_os,
+            True,
+            args.skip_bad_files,
+        )
+    except FastResumeUpdateError as e:
+        logger.error(
+            f"❌ {len(e.failures)} file(s) were not updated. "
+            f"qBittorrent will still have the old paths for them. "
+            f"Restore from the backup archive in the BT_backup directory "
+            f"if you need to start over."
+        )
+        return 1
+    return None
 
 
 if __name__ == "__main__":
-    main()  # pragma: no cover
+    sys.exit(main())  # pragma: no cover
