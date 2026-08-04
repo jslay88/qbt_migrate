@@ -137,7 +137,7 @@ def test_main_version_check(cli_args):
         main()
 
 
-def test_main_with_inputs(monkeypatch, cli_args):
+def test_main_with_inputs(monkeypatch, cli_args, interactive_stdin):
     mock_user_input = MockUserInput(
         ["bt-backup-path", "existing-path", "new-path", "no", "windows"]
     )
@@ -182,7 +182,7 @@ def test_main_with_args(monkeypatch, cli_args):
     assert MockQBTBatchMove.run_call[0][5] is True
 
 
-def test_main_invalid_input_loops(monkeypatch, cli_args):
+def test_main_invalid_input_loops(monkeypatch, cli_args, interactive_stdin):
     monkeypatch.setattr("qbt_migrate.cli.QBTBatchMove", MockQBTBatchMove)
     cli_args("-b", "backup-path", "-e", "e-path", "-n", "n-path", "-s")
     mock_user_input = MockUserInput(
@@ -200,7 +200,7 @@ def test_main_invalid_input_loops(monkeypatch, cli_args):
     assert MockQBTBatchMove.run_call[0][5] is True
 
 
-def test_main_target_os_auto_detect(monkeypatch, cli_args):
+def test_main_target_os_auto_detect(monkeypatch, cli_args, interactive_stdin):
     monkeypatch.setattr("qbt_migrate.cli.QBTBatchMove", MockQBTBatchMove)
     cli_args()
 
@@ -229,7 +229,9 @@ def test_main_target_os_auto_detect(monkeypatch, cli_args):
     assert MockQBTBatchMove.run_call[0][3] is TargetOS.WINDOWS
 
 
-def test_main_blank_bt_backup_path_keeps_default(monkeypatch, cli_args):
+def test_main_blank_bt_backup_path_keeps_default(
+    monkeypatch, cli_args, interactive_stdin
+):
     # Pressing enter at the BT_backup prompt keeps whatever the platform
     # default resolved to rather than setting an empty path.
     monkeypatch.setattr("qbt_migrate.cli.QBTBatchMove", MockQBTBatchMove)
