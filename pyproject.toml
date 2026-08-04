@@ -58,6 +58,34 @@ exclude_dirs = [
     "tests",
 ]
 
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = [
+    "tests",
+]
+addopts = "--strict-markers --strict-config -ra"
+filterwarnings = [
+    "error",
+]
+
+[tool.coverage.run]
+branch = true
+source = [
+    "qbt_migrate",
+]
+
+[tool.coverage.report]
+show_missing = true
+# Currently 99%. The one open partial branch is the `continue` in
+# `discover_relevant_fast_resume`, which depends on `iterdir()` ordering and so
+# can flip between runs. Kept a point below to avoid flaky failures, ratchet up
+# once iteration order is deterministic. diff-cover still enforces 100% on
+# changed lines.
+fail_under = 98
+exclude_also = [
+    "if TYPE_CHECKING:",
+]
+
 [tool.ruff]
 exclude = [
     ".tox",
