@@ -19,6 +19,7 @@ from qbt_migrate.methods import (
     matches_path,
     replace_path,
 )
+from qbt_migrate.names import torrent_name
 from qbt_migrate.plans import MigrationPlan, PlanSummary, diff_data
 
 
@@ -111,7 +112,8 @@ class QBTBatchMove:
                     future.result()
                 except Exception as e:  # noqa: BLE001
                     self.logger.error(
-                        f"🛑 Failed to update {fast_resume.file_path}: {e}"
+                        f"🛑 Failed to update {fast_resume.name} "
+                        f"({fast_resume.file_path.name}): {e}"
                     )
                     failures[fast_resume.file_path] = e
 
@@ -288,6 +290,15 @@ class FastResume:
     @property
     def file_path(self) -> Path:
         return self._file_path
+
+    @property
+    def name(self) -> str:
+        """The torrent's display name, falling back to the file's stem.
+
+        A .fastresume is named after the info hash, so error messages quoting
+        the filename tell the user nothing about which torrent broke.
+        """
+        return torrent_name(self.file_path, self._data)
 
     @property
     def backup_filename(self) -> Path:

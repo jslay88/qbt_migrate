@@ -69,12 +69,17 @@ are quoted to make them visible.
     $ qbt_migrate -e 'S:\' -n /mnt/s/ --dry-run
     Auto detected target OS change. Will convert slashes to Linux/Mac.
     🔍 Dry run. Searching for .fastresume files with path S:\ ...
-    win.fastresume
+    Ubuntu 24.04.1 LTS Desktop (amd64)
         save_path         'S:\Pictures\' -> '/mnt/s/Pictures/'
         qBt-savePath      'S:\Pictures\' -> '/mnt/s/Pictures/'
         qBt-downloadPath  'S:\Incomplete\' -> '/mnt/s/Incomplete/'
         mapped_files      2 of 2 entries, e.g. 'S:\Pictures\a.jpg' -> '/mnt/s/Pictures/a.jpg'
     🔍 1 of 1 relevant fastresume file would be updated. Nothing was written.
+
+Torrents are identified by name rather than by the info hash their `.fastresume` is
+named after. The name comes from `qBt-name`, then libtorrent's `name`, then the sibling
+`<hash>.torrent`, falling back to the hash when none of those exist (a magnet with no
+metadata yet).
 
 Large libraries list the first 20 files and a count of the rest. Add `-l DEBUG` to see all
 of them.
