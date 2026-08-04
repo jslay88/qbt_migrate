@@ -96,7 +96,8 @@ where this usually goes wrong.
 
 * Fully exit qBittorrent. `File` -> `Exit`, the tray icon, or the task manager.
   Closing the window is not enough on Windows, and a running client will
-  rewrite the files back out from memory.
+  rewrite the files back out from memory. `qbt_migrate` checks for this and will
+  offer to stop it, but detection cannot see the host from inside a container.
 * A backup zip is written into `BT_backup` unless you pass `-z`. Keep it until
   you have confirmed the library is seeding.
 * Run with `-l DEBUG` first if you want to see what would be matched, path by

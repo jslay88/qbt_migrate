@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+Added:
+
+* Refuses to write while qBittorrent is running, since it holds resume data in
+  memory and writes `.fastresume` files back out on exit, silently reverting the
+  migration. Interactively it offers to stop it; `-k` / `--stop-qbittorrent`
+  skips the question. A normal quit is sent, never a force kill, which would
+  skip the resume data flush, and the process list is polled until the process
+  is actually gone before anything is written.
+* `--ignore-running` to override the check
+* `--dry-run` is exempt from the check, since it writes nothing
+
+Detection is best effort and finds nothing from inside a container, where
+`/proc` only shows the container's own processes.
+
 ## 3.1.0 (2026-08-04)
 
 Added:

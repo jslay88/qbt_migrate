@@ -15,8 +15,21 @@ It can also convert slashes when migrating between Windows and Linux/Mac.
 **[Source](https://github.com/jslay88/qbt_tv_torrent_uploader)**
 
 ## Usage
-**ALWAYS** ensure qBittorrent is closed before running `qbt_migrate`.
-Either quit through `File` -> `Exit`, task tray icon, or task manager for your system.
+qBittorrent must be closed before `qbt_migrate` writes anything. It keeps resume data in
+memory and writes `.fastresume` files back out when it exits, so editing them underneath a
+running client just gets your changes overwritten.
+
+`qbt_migrate` checks for this and refuses to write while it finds qBittorrent running.
+Interactively it offers to stop it for you; pass `-k` / `--stop-qbittorrent` to skip the
+question. Either way it sends a normal quit (never a force kill, which would skip the
+resume data flush) and waits for the process to actually disappear before touching
+anything. `--ignore-running` overrides the check if you know better.
+
+`--dry-run` is exempt, since it writes nothing.
+
+**NOTE:** detection is best effort. Inside a container `/proc` only shows the container's
+own processes, so a qBittorrent running on the host is invisible to it. Close it yourself
+when running via Docker.
 
 Install from PyPi using `pip`, or run with [Docker](#docker).
 
@@ -24,7 +37,8 @@ Install from PyPi using `pip`, or run with [Docker](#docker).
 
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
-    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-d] [-z] [-l {DEBUG,INFO}] [-v]
+    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-k] [--ignore-running] [-d] [-z]
+                       [-l {DEBUG,INFO}] [-v]
 
     options:
       -h, --help            show this help message and exit
@@ -38,6 +52,9 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
                             BT_backup Path Override.
       -s, --skip-bad-files  Skips bad .fastresume files instead of exiting. Default behavior is to exit.
+      -k, --stop-qbittorrent
+                            Stop a running qBittorrent without asking first, and wait for it to exit.
+      --ignore-running      Run even if qBittorrent is still running. Unsafe: it will overwrite your changes from memory when it exits.
       -d, --dry-run         Show what would change and exit without writing anything.
       -z, --skip-backup     Skips creating a backup zip archive of the BT_backup folder. Default behavior is to create a backup.
       -l {DEBUG,INFO}, --log-level {DEBUG,INFO}
