@@ -1,0 +1,63 @@
+name: Bug report
+description: Something does not work
+labels: [ bug ]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If paths are not being replaced the way you expect, please read
+        [docs/paths.md](https://github.com/jslay88/qbt_migrate/blob/master/docs/paths.md)
+        first. Shell escaping and trailing slashes account for most reports.
+
+  - type: input
+    id: version
+    attributes:
+      label: qbt_migrate version
+      description: Output of `qbt_migrate --version`, or the Docker tag.
+      placeholder: "3.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS and how you installed it (pip, Docker).
+      placeholder: "Windows 11, pip"
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran, copied and pasted.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Full output with `-l DEBUG` added. Redact paths if you need to, but keep the separators intact.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: closed
+    attributes:
+      label: Confirmations
+      options:
+        - label: qBittorrent was fully exited (not just the window closed) before I ran this
+          required: true
+        - label: I am on the latest release
+          required: true

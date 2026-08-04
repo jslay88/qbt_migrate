@@ -77,6 +77,9 @@ Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `
 **NOTE:** Take note of trailing slash replacement when changing from Windows <-> Linux. `-e X:\ -n /torrents` will result in `/torrentsxxxxx`, not `/torrents/xxxxx`.
 The correct pattern for this would be `-e X: -n /torrents` or `-e X:\ -n /torrents/`.
 
+**[docs/paths.md](docs/paths.md) covers escaping, separators, and trailing slashes in full.
+If paths are not being replaced the way you expect, read that first.**
+
     qbt_migrate -e X:\ -n Z:\ -t Windows  # Windows to Windows (Drive letter change)
     qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows  # Windows to Windows (Directory Change)
     qbt_migrate -e X:\Torrents -n Z:\NewDir\Torrents -t Windows  # Windows to Windows (Drive letter change with directory change)
@@ -137,6 +140,9 @@ You can also clone this repository, build the image, and run your own built imag
     docker run --rm -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup qbt_migrate -e X:\ -n Z:\  # Windows to Windows (Drive letter change)
     ...
 
+
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md). `tox -e lint` and `tox -e unittest` are what CI runs.
 
 ## Python Module
 This project has also been built to be modular and used as a Python Module. If you feel like utilizing this project within your own,

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Usage help
+    url: https://github.com/jslay88/qbt_migrate/blob/master/docs/paths.md
+    about: Paths not replacing as expected is almost always escaping or trailing slashes. Start here.
