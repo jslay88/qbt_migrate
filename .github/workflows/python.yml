@@ -1,8 +1,24 @@
 name: Python QA Checks
 # Python checks (usually tox matrix) to ensure code quality for PRs and merging
-# Runs on pull requests
+# Runs on pull requests and on pushes to master
 
-on: pull_request
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Version used for jobs that are not part of the support matrix.
+  DEFAULT_PYTHON: "3.14"
 
 jobs:
   lint:
@@ -10,20 +26,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2.10.2
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
             python:
               - '**.py'
               - 'tox.ini'
+              - 'pyproject.toml'
 
       - name: Setup Python
-        uses: actions/setup-python@v2.2.2
+        uses: actions/setup-python@v7
         if: steps.filter.outputs.python == 'true'
         with:
-          python-version: "3.11"
+          python-version: ${{ env.DEFAULT_PYTHON }}
 
       - name: Install Dependencies
         if: steps.filter.outputs.python == 'true'
@@ -33,43 +50,40 @@ jobs:
 
       - name: Run Tox Linting
         if: steps.filter.outputs.python == 'true'
-        run: tox
-        env:
-          TOXENV: lint
+        run: tox -e lint
 
   unittest:
     name: Unit Tests
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        toxenv:
-          - py38-unittest
-          - py39-unittest
-          - py310-unittest
-          - py311-unittest
         include:
-          - toxenv: py38-unittest
-            python-version: "3.8"
-          - toxenv: py39-unittest
-            python-version: "3.9"
           - toxenv: py310-unittest
             python-version: "3.10"
           - toxenv: py311-unittest
             python-version: "3.11"
+          - toxenv: py312-unittest
+            python-version: "3.12"
+          - toxenv: py313-unittest
+            python-version: "3.13"
+          - toxenv: py314-unittest
+            python-version: "3.14"
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2.10.2
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
             python:
               - '**.py'
               - 'tox.ini'
+              - 'pyproject.toml'
 
       - name: Set up Python
-        uses: actions/setup-python@v2.2.2
+        uses: actions/setup-python@v7
         if: steps.filter.outputs.python == 'true'
         with:
           python-version: "${{ matrix.python-version }}"
@@ -86,19 +100,20 @@ jobs:
           tox -e ${{ matrix.toxenv }}
 
       - name: Dump Test Coverage
-        if: steps.filter.outputs.python == 'true' && matrix.toxenv == 'py311-unittest'
+        if: steps.filter.outputs.python == 'true' && matrix.python-version == '3.14'
         run: |
           pip install coverage
           coverage xml
 
       - name: Store Test Coverage
-        if: steps.filter.outputs.python == 'true' && matrix.toxenv == 'py311-unittest'
-        uses: actions/upload-artifact@v3
+        if: steps.filter.outputs.python == 'true' && matrix.python-version == '3.14'
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: |
             ./.coverage
             ./coverage.xml
+          include-hidden-files: true
 
   coverage:
     runs-on: ubuntu-latest
@@ -107,22 +122,23 @@ jobs:
       - unittest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: dorny/paths-filter@v2.10.2
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
             python:
               - '**.py'
               - 'tox.ini'
+              - 'pyproject.toml'
 
       - name: Setup Python
-        uses: actions/setup-python@v2.2.2
+        uses: actions/setup-python@v7
         if: steps.filter.outputs.python == 'true'
         with:
-          python-version: "3.11"
+          python-version: ${{ env.DEFAULT_PYTHON }}
 
       - name: Install Coverage & diff_cover
         if: steps.filter.outputs.python == 'true'
@@ -132,7 +148,7 @@ jobs:
 
       - name: Retrieve Coverage Results
         if: steps.filter.outputs.python == 'true'
-        uses: actions/download-artifact@v2.0.10
+        uses: actions/download-artifact@v8
         with:
           name: coverage
 
@@ -142,17 +158,17 @@ jobs:
           coverage report
 
       - name: Check Coverage Diff
-        if: steps.filter.outputs.python == 'true'
+        if: steps.filter.outputs.python == 'true' && github.event_name == 'pull_request'
         run: |
-          diff-cover ./coverage.xml --compare-branch=origin/master --fail-under=100
+          diff-cover ./coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=100
 
   build:
     runs-on: ubuntu-latest
-    name: Build Python Package and Upload to TestPyPi
+    name: Build Python Package
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2.10.2
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -161,31 +177,50 @@ jobs:
               - 'pyproject.toml'
 
       - name: Set up Python
-        uses: actions/setup-python@v2.2.2
+        uses: actions/setup-python@v7
         if: steps.filter.outputs.python == 'true'
         with:
-          python-version: "3.11"
+          python-version: ${{ env.DEFAULT_PYTHON }}
 
-      - name: Install Flit
+      - name: Install Tox
         if: steps.filter.outputs.python == 'true'
         run: |
           python -m pip install --upgrade pip
-          pip install flit
+          pip install tox
 
-      - name: Build Python Package and Upload to TestPyPi
+      # Guards the PEP 517 path that `pip install .` and `pip install git+...`
+      # take. Needs no secrets, so it also runs for pull requests from forks.
+      - name: Build and Check Distributions
         if: steps.filter.outputs.python == 'true'
+        run: tox -e build
+
+      - name: Verify Clean Install From Source
+        if: steps.filter.outputs.python == 'true'
+        run: |
+          python -m venv /tmp/install-check
+          /tmp/install-check/bin/pip install .
+          /tmp/install-check/bin/qbt_migrate --version
+
+      - name: Store Python Package as Artifact
+        if: steps.filter.outputs.python == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+      # Fork pull requests cannot read repository secrets, so this is skipped
+      # for them rather than failing the whole job.
+      - name: Upload to TestPyPi
+        if: |
+          steps.filter.outputs.python == 'true'
+          && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
         env:
           FLIT_USERNAME: __token__
           FLIT_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
           FLIT_INDEX_URL: https://test.pypi.org/legacy/
         run: |
+          pip install flit
           sed -i "s/^__version__ = \"\(.*\)\"$/__version__ = \"\1.dev${GITHUB_RUN_ID}\"/" qbt_migrate/__init__.py
           flit install --symlink --deps production
           flit publish
-
-      - name: Store Python Package as Artifact
-        uses: actions/upload-artifact@v2.2.4
-        if: steps.filter.outputs.python == 'true'
-        with:
-          name: dist
-          path: dist/
