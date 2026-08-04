@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+import bencodepy
 import pytest
 
 
@@ -51,6 +52,23 @@ def copy_fastresume(temp_dir):
         return copied
 
     return _copy
+
+
+@pytest.fixture
+def write_fastresume(temp_dir):
+    """Write a `.fastresume` from a dict and return its path.
+
+    Preferred over adding more binary fixtures when the point of the test is
+    the exact contents of the keys.
+    """
+    bencode = bencodepy.Bencode(encoding="utf-8", encoding_fallback="all")
+
+    def _write(name: str, data: dict) -> Path:
+        path = temp_dir / name
+        bencode.write(data, path)
+        return path
+
+    return _write
 
 
 @pytest.fixture
