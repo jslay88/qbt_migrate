@@ -8,18 +8,21 @@ on:
       - "*.*.*"
 
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     name: Build, Upload, and Release
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v2.2.2
+        uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.14"
 
       - name: Install Flit
         run: |
@@ -36,6 +39,7 @@ jobs:
           flit publish
 
       - name: Create GitHub Release with Python Package
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*
+          generate_release_notes: true
