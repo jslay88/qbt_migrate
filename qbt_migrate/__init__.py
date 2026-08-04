@@ -3,6 +3,7 @@
 import logging
 
 from qbt_migrate.classes import FastResume, QBTBatchMove
+from qbt_migrate.exceptions import FastResumeUpdateError, QBTMigrateError
 from qbt_migrate.methods import convert_slashes, discover_bt_backup_path
 
 

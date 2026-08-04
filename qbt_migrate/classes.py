@@ -1,13 +1,14 @@
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from threading import Thread
 
 import bencodepy
 from bencodepy.exceptions import BencodeDecodeError
 
 from qbt_migrate.enums import TargetOS
+from qbt_migrate.exceptions import FastResumeUpdateError
 from qbt_migrate.methods import (
     backup_folder,
     convert_slashes,
@@ -39,6 +40,7 @@ class QBTBatchMove:
         target_os: TargetOS | None = None,
         create_backup: bool = True,
         skip_bad_files: bool = False,
+        max_workers: int | None = None,
     ):
         """
         Perform Batch Processing of path changes.
@@ -57,6 +59,10 @@ class QBTBatchMove:
         :param skip_bad_files: Skip .fastresume files that
         cannot be read successfully.
         :type skip_bad_files: bool
+        :param max_workers: Size of the thread pool used to write files.
+        Defaults to `ThreadPoolExecutor`'s own default.
+        :type max_workers: int
+        :raises FastResumeUpdateError: If any discovered file failed to update.
         """
         if not self.bt_backup_path.is_dir():
             raise NotADirectoryError(self.bt_backup_path)
@@ -72,29 +78,47 @@ class QBTBatchMove:
         self.logger.info(
             f"🕵️ Searching for .fastresume files with path {existing_path} ..."
         )
+        failures: dict[Path, BaseException] = {}
         count = 0
-        for fast_resume in self.discover_relevant_fast_resume(
-            self.bt_backup_path, existing_path, regex_path, not skip_bad_files
-        ):
-            count += 1
-            # Fire and forget
-            self.discovered_files.add(fast_resume)
-            Thread(
-                target=fast_resume.replace_paths,
-                args=[
-                    existing_path,
-                    new_path,
-                    regex_path,
-                    target_os,
-                    True,
-                    False,
-                ],
-            ).start()
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {}
+            for fast_resume in self.discover_relevant_fast_resume(
+                self.bt_backup_path,
+                existing_path,
+                regex_path,
+                not skip_bad_files,
+            ):
+                count += 1
+                self.discovered_files.add(fast_resume)
+                futures[
+                    pool.submit(
+                        fast_resume.replace_paths,
+                        existing_path,
+                        new_path,
+                        regex_path,
+                        target_os,
+                        True,
+                        False,
+                    )
+                ] = fast_resume
+            for future in as_completed(futures):
+                fast_resume = futures[future]
+                try:
+                    future.result()
+                except Exception as e:  # noqa: BLE001
+                    self.logger.error(
+                        f"🛑 Failed to update {fast_resume.file_path}: {e}"
+                    )
+                    failures[fast_resume.file_path] = e
+
+        updated = count - len(failures)
         logger.info(
-            f"{'✔️' if count else '⚠️'} "
-            f"Processed {count} relevant fastresume "
-            f"file{'s' if count > 1 else ''}!"
+            f"{'✔️' if updated else '⚠️'} "
+            f"Updated {updated} of {count} relevant fastresume "
+            f"file{'' if count == 1 else 's'}!"
         )
+        if failures:
+            raise FastResumeUpdateError(failures)
 
     @classmethod
     def discover_relevant_fast_resume(
