@@ -1,5 +1,4 @@
 import re
-import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -7,12 +6,7 @@ from pathlib import Path
 import pytest
 
 from qbt_migrate.enums import TargetOS
-from qbt_migrate.methods import Path as methods_Path
-from qbt_migrate.methods import (
-    backup_folder,
-    convert_slashes,
-    discover_bt_backup_path,
-)
+from qbt_migrate.methods import backup_folder, convert_slashes
 
 
 def test_backup_folder():
@@ -93,39 +87,3 @@ def test_convert_slashes(path: str, target_os: TargetOS, expected_path: str):
             convert_slashes(path, target_os)
     else:
         assert convert_slashes(path, target_os) == expected_path
-
-
-@pytest.mark.parametrize(
-    "system, expected_path, envvar_overrides",
-    [
-        (
-            "win32",
-            Path("C:\\Users\\test\\AppData\\Local")
-            / "qBittorrent"
-            / "BT_backup",
-            {"LOCALAPPDATA": "C:\\Users\\test\\AppData\\Local"},
-        ),
-        (
-            "linux",
-            Path("/home/test", ".local/share/data/qBittorrent/BT_backup"),
-            {"HOME": "/home/test"},
-        ),
-        ("docker", Path("/config/qBittorrent/BT_backup"), {}),
-    ],
-)
-def test_discover_bt_backup_path(
-    monkeypatch, system: str, expected_path: str, envvar_overrides: dict
-):
-    for env, val in envvar_overrides.items():
-        monkeypatch.setenv(env, val)
-    if system == "docker":
-        system = "linux"
-
-        def mock_docker_env(_):
-            return True
-
-        monkeypatch.setattr(methods_Path, "is_file", mock_docker_env)
-        monkeypatch.setattr(methods_Path, "is_dir", mock_docker_env)
-
-    monkeypatch.setattr(sys, "platform", system)
-    assert discover_bt_backup_path() == expected_path

@@ -82,8 +82,17 @@ def replace_path(value: str, existing_path: str, new_path: str) -> str:
     return value
 
 
-def discover_bt_backup_path():
-    logger.debug("Discovering BT_backup path...")
+def bt_backup_path_candidates() -> list[Path]:
+    """Every location qBittorrent might keep BT_backup, in preference order.
+
+    Mirrors `Private::DefaultProfile::dataLocation` in qBittorrent's
+    src/base/profile_p.cpp, which resolves through Qt's QStandardPaths:
+
+    * Windows and macOS use `AppLocalDataLocation`
+    * everything else uses `GenericDataLocation`, falling back to the legacy
+      `<data>/data/qBittorrent` directory only when the current one is absent
+      and the legacy one exists
+    """
     if sys.platform.startswith("win32"):
         logger.debug("Windows System")
         # Path(os.getenv(...), ...) raised TypeError when the variable was
@@ -94,16 +103,48 @@ def discover_bt_backup_path():
             if local_app_data
             else Path.home() / "AppData" / "Local"
         )
-        return base / "qBittorrent" / "BT_backup"
+        return [base / "qBittorrent" / "BT_backup"]
 
-    if (
-        Path("/.dockerenv").is_file()
-        and Path("/config/qBittorrent/BT_backup").is_dir()
-    ):
-        # Default path for config under for image:
-        # https://docs.linuxserver.io/images/docker-qbittorrent
-        logger.debug("qBittorrent Docker container detected")
-        return Path("/config/qBittorrent/BT_backup")
+    if sys.platform.startswith("darwin"):
+        logger.debug("macOS System")
+        # Was handed the Linux path, which is never correct on macOS.
+        return [
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "qBittorrent"
+            / "BT_backup"
+        ]
 
-    logger.debug("Linux/Mac System")
-    return Path.home() / ".local/share/data/qBittorrent/BT_backup"
+    logger.debug("Linux System")
+    # Default path for config under for image:
+    # https://docs.linuxserver.io/images/docker-qbittorrent
+    docker = Path("/config/qBittorrent/BT_backup")
+    xdg_data_home = os.getenv("XDG_DATA_HOME")
+    data_home = (
+        Path(xdg_data_home)
+        if xdg_data_home
+        else Path.home() / ".local" / "share"
+    )
+    return [
+        *([docker] if Path("/.dockerenv").is_file() else []),
+        data_home / "qBittorrent" / "BT_backup",
+        # Pre-4.x layout. qBittorrent still reads it when it is the only one
+        # present, so it stays in the list, just no longer first.
+        data_home / "data" / "qBittorrent" / "BT_backup",
+    ]
+
+
+def discover_bt_backup_path() -> Path:
+    """First BT_backup candidate that exists, else the preferred candidate."""
+    logger.debug("Discovering BT_backup path...")
+    candidates = bt_backup_path_candidates()
+    for candidate in candidates:
+        if candidate.is_dir():
+            logger.debug(f"Found BT_backup at {candidate}")
+            return candidate
+    logger.debug(
+        f"No BT_backup directory found, falling back to {candidates[0]}. "
+        f"Checked: {', '.join(str(path) for path in candidates)}"
+    )
+    return candidates[0]

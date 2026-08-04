@@ -53,10 +53,16 @@ Exit codes: `0` success, `1` one or more `.fastresume` files could not be read o
 By default, everything happens in the BT_backup directory defined by the OS the script is running on.
 Override `BT_backup` path if needed.
 
-Default BT_backup paths:
-* Windows: `%LOCALAPPDATA%/qBittorrent/BT_backup`
-* Linux/Mac: `$HOME/.local/share/data/qBittorrent/BT_backup`
-* Docker: `/config/qBittorrent/BT_backup`
+Default BT_backup paths, checked in this order and matching how qBittorrent itself
+resolves them:
+* Windows: `%LOCALAPPDATA%\qBittorrent\BT_backup`
+* Mac: `$HOME/Library/Application Support/qBittorrent/BT_backup`
+* Linux: `$XDG_DATA_HOME/qBittorrent/BT_backup` (`$HOME/.local/share` when unset),
+  falling back to the pre-4.x `$XDG_DATA_HOME/data/qBittorrent/BT_backup` when only
+  that one exists
+* Docker: `/config/qBittorrent/BT_backup`, checked first when running in a container
+
+Run with `-l DEBUG` to see which candidates were checked and which one was picked.
 
 A backup zip archive is automatically created in the `BT_backup` directory.
 
@@ -110,8 +116,8 @@ For example, mounting in the default BT_backup path on a Windows machine running
 
 Mounting in the default BT_backup path on a Linux/Mac machine running Docker
 
-    docker run --rm -v $HOME/.local/share/data/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\ -n Z:\  # Windows to Windows (Drive letter change)
-    docker run --rm -v $HOME/.local/share/data/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows  # Windows to Windows (Directory Change)
+    docker run --rm -v $HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\ -n Z:\  # Windows to Windows (Drive letter change)
+    docker run --rm -v $HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows  # Windows to Windows (Directory Change)
     ...
 
 If for some reason you wanted to override BT_backup path from `/tmp/BT_backup` within the container, simply set
