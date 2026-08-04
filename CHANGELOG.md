@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+Added:
+
+* `-d` / `--dry-run` shows what every relevant `.fastresume` would become, per
+  key, and writes nothing. Values are quoted so leading and trailing separators
+  are visible, which is the most common way to get a pattern wrong. Files that
+  would fail are reported too, so a dry run surfaces problems rather than only
+  successes.
+* `QBTBatchMove.plan()` and `FastResume.plan_paths()` return the same
+  information as structured `MigrationPlan` objects for library users
+
 ## 3.0.0 (2026-08-04)
 
 Breaking:

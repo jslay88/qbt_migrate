@@ -24,7 +24,7 @@ Install from PyPi using `pip`, or run with [Docker](#docker).
 
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
-    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-z] [-l {DEBUG,INFO}] [-v]
+    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-d] [-z] [-l {DEBUG,INFO}] [-v]
 
     options:
       -h, --help            show this help message and exit
@@ -38,10 +38,29 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
                             BT_backup Path Override.
       -s, --skip-bad-files  Skips bad .fastresume files instead of exiting. Default behavior is to exit.
+      -d, --dry-run         Show what would change and exit without writing anything.
       -z, --skip-backup     Skips creating a backup zip archive of the BT_backup folder. Default behavior is to create a backup.
       -l {DEBUG,INFO}, --log-level {DEBUG,INFO}
                             Log Level, Default is INFO.
       -v, --version         Prints the current version number and exits.
+
+### Check before you commit to it
+Pass `-d` / `--dry-run` to see exactly what would change, per file and per key, without
+writing anything. Trailing separators are the most common way to get this wrong, so values
+are quoted to make them visible.
+
+    $ qbt_migrate -e 'S:\' -n /mnt/s/ --dry-run
+    Auto detected target OS change. Will convert slashes to Linux/Mac.
+    🔍 Dry run. Searching for .fastresume files with path S:\ ...
+    win.fastresume
+        save_path         'S:\Pictures\' -> '/mnt/s/Pictures/'
+        qBt-savePath      'S:\Pictures\' -> '/mnt/s/Pictures/'
+        qBt-downloadPath  'S:\Incomplete\' -> '/mnt/s/Incomplete/'
+        mapped_files      2 of 2 entries, e.g. 'S:\Pictures\a.jpg' -> '/mnt/s/Pictures/a.jpg'
+    🔍 1 of 1 relevant fastresume file would be updated. Nothing was written.
+
+Large libraries list the first 20 files and a count of the rest. Add `-l DEBUG` to see all
+of them.
 
 Anything not passed as an argument is prompted for. When nothing is attached to stdin
 (a container without `-it`, cron, a shell script), `qbt_migrate` does not prompt: it uses

@@ -5,6 +5,7 @@ import logging
 from qbt_migrate.classes import FastResume, QBTBatchMove
 from qbt_migrate.exceptions import FastResumeUpdateError, QBTMigrateError
 from qbt_migrate.methods import convert_slashes, discover_bt_backup_path
+from qbt_migrate.plans import MigrationPlan, PathChange, PlanSummary
 
 
 # Must stay a plain string literal so flit can read it without importing the
@@ -15,6 +16,9 @@ __version__ = "3.0.0"
 __all__ = [
     "FastResume",
     "FastResumeUpdateError",
+    "MigrationPlan",
+    "PathChange",
+    "PlanSummary",
     "QBTBatchMove",
     "QBTMigrateError",
     "convert_slashes",
