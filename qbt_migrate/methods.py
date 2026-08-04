@@ -3,7 +3,6 @@ import os
 import sys
 import zipfile
 from pathlib import Path
-from typing import Union
 
 from qbt_migrate.enums import TargetOS
 
@@ -12,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def backup_folder(
-    folder_path: Union[str, Path],
-    archive_path: Union[str, Path],
+    folder_path: str | Path,
+    archive_path: str | Path,
     include_torrents: bool = True,
 ):
     logger.info(f"🗄️ Creating Archive {archive_path} ...")
