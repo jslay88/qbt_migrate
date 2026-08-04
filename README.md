@@ -24,7 +24,7 @@ Install from PyPi using `pip`, or run with [Docker](#docker).
 
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
-    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-l {DEBUG,INFO}] [-v]
+    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-z] [-l {DEBUG,INFO}] [-v]
 
     options:
       -h, --help            show this help message and exit
@@ -38,6 +38,7 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
                             BT_backup Path Override.
       -s, --skip-bad-files  Skips bad .fastresume files instead of exiting. Default behavior is to exit.
+      -z, --skip-backup     Skips creating a backup zip archive of the BT_backup folder. Default behavior is to create a backup.
       -l {DEBUG,INFO}, --log-level {DEBUG,INFO}
                             Log Level, Default is INFO.
       -v, --version         Prints the current version number and exits.
@@ -64,7 +65,9 @@ resolves them:
 
 Run with `-l DEBUG` to see which candidates were checked and which one was picked.
 
-A backup zip archive is automatically created in the `BT_backup` directory.
+A backup zip archive is automatically created in the `BT_backup` directory. Pass `-z` /
+`--skip-backup` to skip it, which is worth doing when you already have one and are making
+a series of path changes over a large library, since zipping every run gets slow.
 
 ### Examples
 Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `/torrents` when coming from Linux/Mac

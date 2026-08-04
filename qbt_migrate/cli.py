@@ -55,6 +55,15 @@ def parse_args(args=None):
     )
 
     parser.add_argument(
+        "-z",
+        "--skip-backup",
+        help="Skips creating a backup zip archive of the BT_backup folder. "
+        "Default behavior is to create a backup.",
+        action="store_true",
+        default=False,
+    )
+
+    parser.add_argument(
         "-l",
         "--log-level",
         help="Log Level, Default is INFO.",
@@ -204,15 +213,20 @@ def main() -> int | None:
 
     logger.debug(
         f"Existing Path: {args.existing_path}, New Path: {args.new_path}, "
-        f"Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}"
+        f"Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}, "
+        f"Skip Backup: {args.skip_backup}"
     )
+    if args.skip_backup:
+        logger.warning(
+            "⚠️ Skipping the backup archive. Make sure you have one already."
+        )
     try:
         qbm.run(
             args.existing_path,
             args.new_path,
             args.regex,
             args.target_os,
-            True,
+            not args.skip_backup,
             args.skip_bad_files,
         )
     except (BencodeDecodeError, ValueError) as e:
