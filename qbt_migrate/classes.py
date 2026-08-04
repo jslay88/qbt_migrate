@@ -3,7 +3,6 @@ import re
 from datetime import datetime
 from pathlib import Path
 from threading import Thread
-from typing import Optional, Union
 
 import bencodepy
 from bencodepy.exceptions import BencodeDecodeError
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 bencode = bencodepy.Bencode(encoding="utf-8", encoding_fallback="all")
 
 
-class QBTBatchMove(object):
+class QBTBatchMove:
     logger = logging.getLogger(__name__ + ".QBTBatchMove")
 
     def __init__(self, bt_backup_path: str = None):
@@ -35,7 +34,7 @@ class QBTBatchMove(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[TargetOS] = None,
+        target_os: TargetOS | None = None,
         create_backup: bool = True,
         skip_bad_files: bool = False,
     ):
@@ -62,7 +61,7 @@ class QBTBatchMove(object):
         if create_backup:
             backup_filename = (
                 f"fastresume_backup"
-                f'{datetime.now().strftime("%Y%m%d%H%M%S")}.zip'
+                f"{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
             )
             backup_folder(
                 self.bt_backup_path, self.bt_backup_path / backup_filename
@@ -98,7 +97,7 @@ class QBTBatchMove(object):
     @classmethod
     def discover_relevant_fast_resume(
         cls,
-        bt_backup_path: Union[str, Path],
+        bt_backup_path: str | Path,
         existing_path: str,
         regex_path: bool = False,
         raise_on_error: bool = True,
@@ -165,9 +164,7 @@ class QBTBatchMove(object):
         return
 
     @classmethod
-    def backup_folder(
-        cls, folder_path: Union[str, Path], archive_path: Union[str, Path]
-    ):
+    def backup_folder(cls, folder_path: str | Path, archive_path: str | Path):
         return backup_folder(folder_path, archive_path)
 
     @classmethod
@@ -177,7 +174,7 @@ class QBTBatchMove(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[TargetOS] = None,
+        target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -193,10 +190,10 @@ class QBTBatchMove(object):
         )
 
 
-class FastResume(object):
+class FastResume:
     logger = logging.getLogger(__name__ + ".FastResume")
 
-    def __init__(self, file_path: Union[str, Path]):
+    def __init__(self, file_path: str | Path):
         self._file_path = Path(file_path)
         if not self.file_path.is_file():
             raise FileNotFoundError(self.file_path)
@@ -211,21 +208,21 @@ class FastResume(object):
     @property
     def backup_filename(self) -> Path:
         return Path(
-            f'{self.file_path}.{datetime.now().strftime("%Y%m%d%H%M%S")}.bkup'
+            f"{self.file_path}.{datetime.now().strftime('%Y%m%d%H%M%S')}.bkup"
         )
 
     @property
-    def save_path(self) -> Optional[str]:
+    def save_path(self) -> str | None:
         if "save_path" in self._data:
             return self._data["save_path"]
 
     @property
-    def qbt_download_path(self) -> Optional[str]:
+    def qbt_download_path(self) -> str | None:
         if "qBt-downloadPath" in self._data:
             return self._data["qBt-downloadPath"]
 
     @property
-    def qbt_save_path(self) -> Optional[str]:
+    def qbt_save_path(self) -> str | None:
         if "qBt-savePath" in self._data:
             return self._data["qBt-savePath"]
 
@@ -238,7 +235,7 @@ class FastResume(object):
         self,
         path: str,
         key: str = "save_path",
-        target_os: Optional[TargetOS] = None,
+        target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -263,9 +260,9 @@ class FastResume(object):
     def set_save_paths(
         self,
         path: str,
-        qbt_path: Optional[str] = None,
-        qbt_download_path: Optional[str] = None,
-        target_os: Optional[TargetOS] = None,
+        qbt_path: str | None = None,
+        qbt_download_path: str | None = None,
+        target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):
@@ -320,7 +317,7 @@ class FastResume(object):
         if save_file:
             self.save()
 
-    def save(self, file_name: Union[str, Path, None] = None):
+    def save(self, file_name: str | Path | None = None):
         if file_name is None:
             file_name = self.file_path
         self.logger.debug(f"Saving File {file_name}...")
@@ -331,7 +328,7 @@ class FastResume(object):
         existing_path: str,
         new_path: str,
         regex_path: bool = False,
-        target_os: Optional[TargetOS] = None,
+        target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
     ):

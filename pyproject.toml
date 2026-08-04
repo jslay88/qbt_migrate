@@ -8,9 +8,9 @@ authors = [
     {name = "Justin Slay", email = "justin.slay@gmail.com"},
 ]
 dependencies = [
-    "bencode.py==4.0.0",
+    "bencode.py>=4.0,<5",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 readme = "README.md"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -18,10 +18,11 @@ classifiers = [
     "Intended Audience :: End Users/Desktop",
     "Intended Audience :: Information Technology",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Communications :: File Sharing",
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -36,10 +37,8 @@ dynamic = [
 [project.optional-dependencies]
 dev = [
     "bandit",
-    "black",
     "coverage",
     "diff-cover",
-    "isort",
     "pre-commit",
     "pytest>=2.7.3",
     "ruff",
@@ -59,27 +58,31 @@ exclude_dirs = [
     "tests",
 ]
 
-[tool.black]
-line-length = 79
-target-version = ['py311']
-include = '\.pyi?$'
-
-[tool.isort]
-profile = "black"
-line_length = 79
-lines_after_imports = 2
-skip = [".tox", "venv"]
-
 [tool.ruff]
 exclude = [
+    ".tox",
     "venv",
-    "__init__.py",
 ]
 line-length = 79
+target-version = "py310"
+
+[tool.ruff.lint]
 select = [
-    "B",
-    "C",
-    "E",
-    "F",
-    "W",
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "C90", # mccabe complexity
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "W",   # pycodestyle warnings
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# F401: re-exports for the public API surface.
+# E501: the module docstring is the package summary in built metadata, so it
+#       has to stay on one line.
+"qbt_migrate/__init__.py" = ["E501", "F401"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
