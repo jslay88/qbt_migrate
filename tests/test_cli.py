@@ -49,6 +49,7 @@ def test_parse_args_defaults():
             "target_os",
             "bt_backup_path",
             "skip_bad_files",
+            "skip_backup",
             "log_level",
         ]
     )
@@ -58,6 +59,7 @@ def test_parse_args_defaults():
     assert args.target_os is None
     assert args.bt_backup_path is None
     assert args.skip_bad_files is False
+    assert args.skip_backup is False
     assert args.log_level == "INFO"
 
 
@@ -75,6 +77,7 @@ def test_parse_args_shorthand():
             "-b",
             "bt-backup-path",
             "-s",
+            "-z",
             "-l",
             "DEBUG",
         ]
@@ -85,6 +88,7 @@ def test_parse_args_shorthand():
     assert args.target_os == "Linux"
     assert args.bt_backup_path == "bt-backup-path"
     assert args.skip_bad_files is True
+    assert args.skip_backup is True
     assert args.log_level == "DEBUG"
 
 
@@ -102,6 +106,7 @@ def test_parse_args_longhand():
             "--bt-backup-path",
             "bt-backup-path",
             "--skip-bad-files",
+            "--skip-backup",
             "--log-level",
             "DEBUG",
         ]
@@ -112,6 +117,7 @@ def test_parse_args_longhand():
     assert args.target_os == "Linux"
     assert args.bt_backup_path == "bt-backup-path"
     assert args.skip_bad_files is True
+    assert args.skip_backup is True
     assert args.log_level == "DEBUG"
 
 
