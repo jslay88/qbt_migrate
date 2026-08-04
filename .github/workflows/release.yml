@@ -1,20 +1,19 @@
 name: Package and Release
-# Build Python package for PyPi and GitGub release, and then publish a GitHub Release
-# Runs on semantic versioned tags only
+# Builds the distributions, publishes to PyPI via Trusted Publishing, and cuts
+# a GitHub Release.
+# Runs on semantic versioned tags only.
 
 on:
   push:
     tags:
       - "*.*.*"
 
-
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Build, Upload, and Release
+    name: Build Distributions
 
     steps:
       - uses: actions/checkout@v7
@@ -24,22 +23,66 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Install Flit
+      - name: Check Tag Matches Package Version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="$(grep -oP '^__version__ = "\K[^"]+' qbt_migrate/__init__.py)"
+          echo "tag=$TAG package=$VERSION"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::Tag $TAG does not match __version__ $VERSION"
+            exit 1
+          fi
+
+      - name: Build and Check Distributions
         run: |
           python -m pip install --upgrade pip
-          pip install flit
+          pip install tox
+          tox -e build
 
-      - name: Build Python Package and Upload to PyPi
-        env:
-          FLIT_USERNAME: __token__
-          FLIT_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-          FLIT_INDEX_URL: https://upload.pypi.org/legacy/
-        run: |
-          flit install --symlink --deps production
-          flit publish
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
 
-      - name: Create GitHub Release with Python Package
-        uses: softprops/action-gh-release@v3
+  pypi:
+    runs-on: ubuntu-latest
+    name: Publish to PyPI
+    needs:
+      - build
+    environment:
+      name: pypi
+      url: https://pypi.org/p/qbt_migrate
+    permissions:
+      # Required for Trusted Publishing. Replaces the long-lived PYPI_TOKEN
+      # secret with a short-lived OIDC exchange.
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@v1.14.2
+        with:
+          attestations: true
+
+  release:
+    runs-on: ubuntu-latest
+    name: Create GitHub Release
+    needs:
+      - pypi
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           generate_release_notes: true
