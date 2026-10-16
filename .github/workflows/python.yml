@@ -213,23 +213,35 @@ jobs:
           path: dist/
 
       # Forks never match the repo check below. Dependabot pull requests do,
-      # but GitHub does not pass repository secrets to them, and flit publish
-      # fails closed when FLIT_PASSWORD is empty.
-      - name: Upload to TestPyPi
+      # but GitHub does not pass repository secrets to them.
+      - name: Build TestPyPI distributions
+        id: testpypi
         if: |
           steps.filter.outputs.python == 'true'
           && github.event_name == 'pull_request'
           && github.event.pull_request.head.repo.full_name == github.repository
         env:
-          FLIT_USERNAME: __token__
-          FLIT_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
-          FLIT_INDEX_URL: https://test.pypi.org/legacy/
+          TESTPYPI_TOKEN: ${{ secrets.TESTPYPI_TOKEN }}
         run: |
-          if [ -z "${FLIT_PASSWORD}" ]; then
+          if [ -z "${TESTPYPI_TOKEN}" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
             echo "TESTPYPI_TOKEN is not available for this pull request. Skipping TestPyPI upload."
             exit 0
           fi
-          pip install flit
+          echo "available=true" >> "$GITHUB_OUTPUT"
+          python -m pip install --upgrade pip
+          pip install build
           sed -i "s/^__version__ = \"\(.*\)\"$/__version__ = \"\1.dev${GITHUB_RUN_ID}\"/" qbt_migrate/__init__.py
-          flit install --symlink --deps production
-          flit publish
+          # The earlier build step already filled dist/ with the release version.
+          rm -rf dist
+          python -m build
+
+      - name: Upload to TestPyPI
+        if: steps.testpypi.outputs.available == 'true'
+        uses: pypa/gh-action-pypi-publish@v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist
+          password: ${{ secrets.TESTPYPI_TOKEN }}
+          # Token upload, not Trusted Publishing. Attestations need OIDC.
+          attestations: false
