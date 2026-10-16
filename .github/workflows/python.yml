@@ -212,8 +212,9 @@ jobs:
           name: dist
           path: dist/
 
-      # Fork pull requests cannot read repository secrets, so this is skipped
-      # for them rather than failing the whole job.
+      # Forks never match the repo check below. Dependabot pull requests do,
+      # but GitHub does not pass repository secrets to them, and flit publish
+      # fails closed when FLIT_PASSWORD is empty.
       - name: Upload to TestPyPi
         if: |
           steps.filter.outputs.python == 'true'
@@ -224,6 +225,10 @@ jobs:
           FLIT_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
           FLIT_INDEX_URL: https://test.pypi.org/legacy/
         run: |
+          if [ -z "${FLIT_PASSWORD}" ]; then
+            echo "TESTPYPI_TOKEN is not available for this pull request. Skipping TestPyPI upload."
+            exit 0
+          fi
           pip install flit
           sed -i "s/^__version__ = \"\(.*\)\"$/__version__ = \"\1.dev${GITHUB_RUN_ID}\"/" qbt_migrate/__init__.py
           flit install --symlink --deps production
