@@ -238,7 +238,7 @@ jobs:
 
       - name: Upload to TestPyPI
         if: steps.testpypi.outputs.available == 'true'
-        uses: pypa/gh-action-pypi-publish@v1.14.2
+        uses: pypa/gh-action-pypi-publish@v1.14.3
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist
