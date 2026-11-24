@@ -76,6 +76,10 @@ qbt_migrate -r -e 'X:\\\\(\w+)' -n '/mnt/x/\1'
 Capture groups are recommended so you are not throwing away the rest of the
 path.
 
+When `-t` is left out, the target OS is guessed from the separators in the two
+patterns. In regex mode backreferences (`\1`, `\g<1>`) and escapes (`\w`) are
+ignored for that guess; a backslash counts only when written as `\\`.
+
 ## Check first
 
 `--dry-run` prints what each key would become, per file, and writes nothing. Use
