@@ -12,7 +12,8 @@ On Linux and Mac, `\` is the shell's escape character. When you type:
 qbt_migrate -e X:\ -n /torrents/
 ```
 
-your shell hands `qbt_migrate` the string `X:` because `\ ` escaped the space.
+your shell hands `qbt_migrate` the string `X: -n` because `\ ` escaped the space
+and glued the next argument on.
 You have to double it:
 
 ```
@@ -39,9 +40,13 @@ the separators of whatever platform wrote the file. A library that has moved
 between machines can have a mix, sometimes within a single `.fastresume`.
 
 You do not need to care. `qbt_migrate` matches your pattern against both
-conventions, so `-e 'S:\'` and `-e 'S:/'` find the same files and produce the
-same result. This was not true before 3.0, which is why older reports mention
-needing several passes ([#75](https://github.com/jslay88/qbt_migrate/issues/75)).
+conventions, so `-e 'S:\'` and `-e 'S:/'` find the same files. This was not
+true before 3.0, which is why older reports mention needing several passes
+([#75](https://github.com/jslay88/qbt_migrate/issues/75)).
+
+Pass `-t` when moving between Windows and Linux/Mac. Auto-detect only fires
+when one path has `\` and the other has `/`, so with `-e 'S:/' -n /mnt/s/` the
+rest of the path keeps its backslashes (`/mnt/s/Pictures\`).
 
 The replacement is idempotent. Running the same command twice changes nothing
 the second time. If a second run does find work, that is a bug worth reporting.
@@ -55,10 +60,14 @@ separators at the join, so the trailing slash has to match on both sides.
 | --- | --- | --- |
 | `-e 'X:\' -n /torrents` | `/torrentsTorrents/movie` | wrong |
 | `-e 'X:\' -n /torrents/` | `/torrents/Torrents/movie` | ok |
-| `-e 'X:' -n /torrents` | `/torrents/Torrents/movie` | ok |
+| `-e 'X:' -n /torrents -t Linux` | `/torrents/Torrents/movie` | ok |
 | `-e 'X:\Torrents' -n /torrents` | `/torrents/movie` | ok |
 
 Either put a trailing separator on both, or on neither.
+
+The swap is not anchored to the start of the path either. `-e /data -n /new`
+also turns `/srv/data/x` into `/srv/new/x`. Use a path specific enough to only
+match what you mean, and check with `--dry-run`.
 
 ## Regex mode is a separate contract
 
@@ -70,11 +79,12 @@ If you need to match a Windows path in regex mode, escape the separators
 yourself:
 
 ```
-qbt_migrate -r -e 'X:\\\\(\w+)' -n '/mnt/x/\1'
+qbt_migrate -r -e 'X:\\(\w+)' -n '/mnt/x/\1' -t Linux
 ```
 
 Capture groups are recommended so you are not throwing away the rest of the
-path.
+path. Pass `-t` as well: without it, a `\1` in the new path can make auto-detect
+pick Windows and write the result with backslashes.
 
 ## Check first
 
@@ -100,5 +110,5 @@ where this usually goes wrong.
   offer to stop it, but detection cannot see the host from inside a container.
 * A backup zip is written into `BT_backup` unless you pass `-z`. Keep it until
   you have confirmed the library is seeding.
-* Run with `-l DEBUG` first if you want to see what would be matched, path by
-  path.
+* Run with `-d` / `--dry-run` first if you want to see what would be matched,
+  path by path. `-l DEBUG` only adds detail to a real run; it still writes.
