@@ -1,6 +1,6 @@
 import logging
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from copy import copy, deepcopy
 from datetime import datetime
@@ -20,11 +20,19 @@ from qbt_migrate.methods import (
     replace_path,
 )
 from qbt_migrate.names import torrent_name
-from qbt_migrate.plans import MigrationPlan, PlanSummary, diff_data
+from qbt_migrate.plans import (
+    MAPPED_FILES_KEY,
+    PATH_KEYS,
+    MigrationPlan,
+    PlanSummary,
+    diff_data,
+)
 
 
 logger = logging.getLogger(__name__)
 bencode = bencodepy.Bencode(encoding="utf-8", encoding_fallback="all")
+# The path keys discovery matches against.
+DISCOVERY_KEYS = ("save_path", "qBt-savePath")
 
 
 class QBTBatchMove:
@@ -204,6 +212,9 @@ class QBTBatchMove:
             if file.name.endswith(".fastresume"):
                 try:
                     fast_resume = FastResume(bt_backup_path / file)
+                    # Only the keys matched below: a bad mapped_files entry
+                    # in a torrent this run never touches is not our problem.
+                    fast_resume.check_text_paths(DISCOVERY_KEYS)
                 except (
                     BencodeDecodeError,
                     FileNotFoundError,
@@ -321,6 +332,27 @@ class FastResume:
     @property
     def mapped_files(self) -> list[str] | None:
         return cast("list[str] | None", self._data.get("mapped_files"))
+
+    def check_text_paths(
+        self, keys: Iterable[str] = (*PATH_KEYS, MAPPED_FILES_KEY)
+    ) -> None:
+        """Raise `ValueError` if a path under `keys` is not valid UTF-8.
+
+        The decoder hands back bytes for a string that is not valid UTF-8,
+        such as a path written under a Latin-1 locale. The path code only
+        works on str, so this used to escape as a bare `TypeError`.
+
+        :raises ValueError: Naming the torrent and the key.
+        """
+        for key in keys:
+            value = self._data.get(key)
+            # mapped_files is a list; the other keys hold a single path.
+            values = value if isinstance(value, list) else [value]
+            if any(isinstance(item, bytes) for item in values):
+                raise ValueError(
+                    f"{self.name} ({self.file_path.name}): {key} is not "
+                    f"valid UTF-8, so its paths cannot be migrated"
+                )
 
     def set_save_path(
         self,
@@ -468,6 +500,8 @@ class FastResume:
         self.logger.debug(f"Target OS: {target_os}")
         self.logger.debug(f"Save File: {save_file}")
         self.logger.debug(f"Create Backup: {create_backup}")
+        # Before any key is rewritten, so a failure leaves _data untouched.
+        self.check_text_paths()
         if regex_path:
             new_save_path = None
             new_qbt_save_path = None
