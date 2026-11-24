@@ -23,9 +23,15 @@ between Windows and Linux/Mac.
 
 ## Quick start
 1. **Fully quit qBittorrent** (`File` -> `Exit`, or the tray icon). Closing the window is not enough.
+   If qBittorrent runs in Docker, stop its container, see [Safety](#qbittorrent-must-be-closed).
 2. **Preview** with `--dry-run`. Nothing is written.
 3. **Run it for real** with the same arguments, minus `--dry-run`. A backup zip of
    `BT_backup` is made first.
+4. **Start qBittorrent** and check a few torrents. If something looks wrong, see
+   [Undo a run](#undo-a-run).
+
+`-e` is the path as qBittorrent has it stored, the one in its **Save Path** column, not
+where the files are on disk today. `-n` is the path qBittorrent should use from now on.
 
 With pip, on Linux/Mac:
 
@@ -52,7 +58,7 @@ docker run --rm -v "$HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup" jsl
 docker run --rm -v "$HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup" jslay88/qbt_migrate -e /old/torrents -n /new/torrents
 ```
 
-With Docker, on a Windows host (`cmd`):
+With Docker, on a Windows host (`cmd`; in PowerShell write `$env:LOCALAPPDATA`):
 
 ```bat
 docker run --rm -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n Z:\Torrents --dry-run
@@ -68,7 +74,8 @@ before anything else.
 
 ## Installation
 ### pip
-Install from PyPI:
+You need [Python](https://www.python.org/downloads/) 3.10 or newer and
+[pip](https://pip.pypa.io/en/stable/installation/). Install from PyPI:
 
 ```sh
 pip install qbt_migrate
@@ -77,8 +84,14 @@ pip install qbt_migrate
 This gives you the `qbt_migrate` command. Run it and follow the prompts, or pass
 everything as arguments.
 
+* `pip` not found: use `python3 -m pip` on Linux/Mac, or `py -m pip` on Windows.
+* pip refuses with `externally-managed-environment` (common on Linux distributions), or
+  `qbt_migrate` is not found after installing: install it with
+  [pipx](https://packaging.python.org/en/latest/guides/installing-stand-alone-command-line-tools/)
+  instead, `pipx install qbt_migrate`, which also puts the command on your `PATH`.
+
 ### Docker
-Use Docker if you don't have Python, or don't want to install the package on your system
+Use [Docker](https://docs.docker.com/get-started/get-docker/) if you don't have Python, or don't want to install the package on your system
 directly. The image has all the functionality of the pip install and takes the same
 arguments.
 
@@ -203,11 +216,23 @@ anything. `--ignore-running` overrides the check if you know better.
 > processes, so a qBittorrent running on the host is invisible to it. Close it yourself
 > when running via Docker.
 
+* **Desktop:** if qBittorrent is set to close to the notification area, closing the
+  window leaves it running. Use `File` -> `Exit` or quit from the tray icon.
+* **qBittorrent in Docker:** stop its container, for example
+  `docker stop -t 60 qbittorrent`. Docker kills a container that has not exited after
+  [10 seconds by default](https://docs.docker.com/reference/cli/docker/container/stop/),
+  and a large library can need longer to save its resume data.
+
 ### Automatic backup
 A backup zip archive of the `BT_backup` folder is automatically created inside the
 `BT_backup` directory before anything is changed. Pass `-z` / `--skip-backup` to skip it,
 which is worth doing when you already have one and are making a series of path changes
 over a large library, since zipping every run gets slow.
+
+### Undo a run
+Quit qBittorrent, then extract the newest `fastresume_backup<date>.zip` from `BT_backup`
+into `BT_backup` itself, replacing the files there. The zip holds the `.fastresume` and
+`.torrent` files as they were before the run.
 
 ### Unreadable files
 By default `qbt_migrate` stops at a `.fastresume` file it cannot read. Pass `-s` /
@@ -253,8 +278,20 @@ resolves them:
 
 Run with `-l DEBUG` to see which candidates were checked and which one was picked.
 
+**qBittorrent itself running in Docker** (for example the
+[linuxserver image](https://docs.linuxserver.io/images/docker-qbittorrent/)): `BT_backup`
+is in the host folder you mapped to `/config`, under `qBittorrent/BT_backup`. That is the
+folder to mount or pass to `-b`. The save paths inside are the paths qBittorrent sees
+inside its container (such as `/downloads/...`), so use those for `-e` and `-n`.
+
+> [!NOTE]
+> `qbt_migrate` edits the `.fastresume` files in `BT_backup`. If qBittorrent's
+> **Resume data storage type** (Advanced settings) is set to **SQLite database**, it keeps
+> resume data in `torrents.db` next to `BT_backup` instead, and `qbt_migrate` does not
+> edit that database.
+
 ## Paths and slashes
-Most path problems come down to three things:
+Most path problems come down to these:
 
 * **Shell escaping.** On Linux/Mac, `\` is the shell's escape character, so Windows paths
   need a doubled `\\` or single quotes: `C:\\Users\\user\\Downloads\\Torrents` or
@@ -268,6 +305,19 @@ Most path problems come down to three things:
   `-e /data -n /new` also turns `/srv/data/x` into `/srv/new/x`. Use a path that is
   specific enough, and check with `--dry-run`.
 * **Mixed separators** are handled for you: `-e 'S:\'` and `-e 'S:/'` find the same files.
+
+Quoting per shell:
+
+| Shell | Windows paths | Regex (`-r`) |
+| --- | --- | --- |
+| bash, zsh (Linux/Mac) | `'X:\Torrents'` or `X:\\Torrents` | single quotes: `'/some/(\w+)/.*$'` |
+| PowerShell | `X:\Torrents` or `'X:\Torrents'` | single quotes, `(` is special unquoted |
+| cmd | `X:\Torrents`, no quotes needed | no quotes needed |
+
+In `cmd`, single quotes are passed through as part of the path, so leave them off. If a
+path has spaces, use double quotes and leave off a trailing `\` inside them:
+`"X:\My Torrents"` works, `"X:\My Torrents\"` does not, because
+[`\"` reads as a literal quote](https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments).
 
 [docs/paths.md](docs/paths.md) covers escaping, separators, and trailing slashes in full.
 If paths are not being replaced the way you expect, read that first.
