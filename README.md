@@ -20,6 +20,7 @@ between Windows and Linux/Mac.
 * [Exit codes](#exit-codes)
 * [Python module](#python-module)
 * [Contributing](#contributing)
+* [Also by the author](#also-by-the-author)
 
 ## Quick start
 1. **Fully quit qBittorrent** (`File` -> `Exit`, or the tray icon). Closing the window is not enough.
@@ -30,8 +31,10 @@ between Windows and Linux/Mac.
 4. **Start qBittorrent** and check a few torrents. If something looks wrong, see
    [Undo a run](#undo-a-run).
 
-`-e` is the path as qBittorrent has it stored, the one in its **Save Path** column, not
-where the files are on disk today. `-n` is the path qBittorrent should use from now on.
+`-e` is the path as qBittorrent has it stored, not where the files are on disk today. You
+can see it in a torrent's **General** tab (**Save Path**), or right-click the column header
+of the torrent list and tick **Save Path**. `-n` is the path qBittorrent should use from
+now on. Moving between Windows and Linux/Mac? Add `-t`, see [Usage](#usage).
 
 With pip, on Linux/Mac:
 
@@ -49,7 +52,9 @@ qbt_migrate -e X:\Torrents -n Z:\Torrents --dry-run
 qbt_migrate -e X:\Torrents -n Z:\Torrents
 ```
 
-Anything you leave off is asked for. Press Enter to accept the default shown.
+Anything you leave off is asked for. In a terminal it also asks whether the paths are
+regex patterns and for the target OS: press Enter for both (no regex, auto-detect), and
+Enter again to accept the `BT_backup` path shown.
 
 With Docker, on a Linux host (mount your `BT_backup` at `/tmp/BT_backup`):
 
@@ -61,8 +66,8 @@ docker run --rm -v "$HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup" jsl
 With Docker, on a Windows host (`cmd`; in PowerShell write `$env:LOCALAPPDATA`):
 
 ```bat
-docker run --rm -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n Z:\Torrents --dry-run
-docker run --rm -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n Z:\Torrents
+docker run --rm -v "%LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup" jslay88/qbt_migrate -e X:\Torrents -n Z:\Torrents --dry-run
+docker run --rm -v "%LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup" jslay88/qbt_migrate -e X:\Torrents -n Z:\Torrents
 ```
 
 > [!WARNING]
@@ -120,39 +125,46 @@ The examples assume your torrents are in `X:\Torrents` when coming from Windows,
 The Windows rows are typed in `cmd` or PowerShell. On Linux/Mac, single-quote Windows
 paths (see [Paths and slashes](#paths-and-slashes)).
 
-`-t` converts slashes for the target OS. Leave it off and it is auto-detected from the
-existing and new paths.
+`-t` converts slashes for the target OS. Leave it off and it is auto-detected, but only
+when one of the two paths has `\` and the other has `/`.
 
 ### More examples
 Running on Windows (`cmd` or PowerShell), where a single `\` is fine:
 
-```bat
-qbt_migrate -e X:\ -n Z:\ -t Windows  &:: Windows to Windows (drive letter change)
-qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows  &:: Windows to Windows (directory change)
-qbt_migrate -e X:\Torrents -n Z:\NewDir\Torrents -t Windows  &:: Windows to Windows (drive letter change with directory change)
-qbt_migrate -e X: -n /torrents -t Linux  &:: Windows to Linux/Mac (converts slashes). Note the trailing slash
-qbt_migrate -e X:\Torrents -n /torrents -t Linux  &:: Windows to Linux/Mac (converts slashes)
-qbt_migrate -e /torrents -n Z:\Torrents -t Windows  &:: Linux/Mac to Windows (converts slashes)
-```
+| Example | Command |
+| --- | --- |
+| Windows to Windows (drive letter change) | `qbt_migrate -e X:\ -n Z:\ -t Windows` |
+| Windows to Windows (directory change) | `qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows` |
+| Windows to Windows (drive letter change with directory change) | `qbt_migrate -e X:\Torrents -n Z:\NewDir\Torrents -t Windows` |
+| Windows to Linux/Mac (converts slashes). Note the trailing slash | `qbt_migrate -e X: -n /torrents -t Linux` |
+| Windows to Linux/Mac (converts slashes) | `qbt_migrate -e X:\Torrents -n /torrents -t Linux` |
+| Linux/Mac to Windows (converts slashes) | `qbt_migrate -e /torrents -n Z:\Torrents -t Windows` |
 
 Running on Linux/Mac, where Windows paths need a doubled `\\` or single quotes:
 
-```sh
-qbt_migrate -e /torrents -n /new/path/for/torrents  # Changes torrent root path on Linux/Mac
-qbt_migrate -e X: -n /torrents -t Linux  # Windows to Linux/Mac (converts slashes). Note the trailing slash
-qbt_migrate -e X:\\Torrents -n /torrents -t Linux  # Windows to Linux/Mac (converts slashes)
-qbt_migrate -e 'X:\Torrents' -n /torrents -t Linux  # Same, single-quoted
-qbt_migrate -e /torrents -n Z:\\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)
-```
+| Example | Command |
+| --- | --- |
+| Changes torrent root path on Linux/Mac | `qbt_migrate -e /torrents -n /new/path/for/torrents` |
+| Windows to Linux/Mac (converts slashes). Note the trailing slash | `qbt_migrate -e X: -n /torrents -t Linux` |
+| Windows to Linux/Mac (converts slashes) | `qbt_migrate -e X:\\Torrents -n /torrents -t Linux` |
+| Same, single-quoted | `qbt_migrate -e 'X:\Torrents' -n /torrents -t Linux` |
+| Linux/Mac to Windows (converts slashes) | `qbt_migrate -e /torrents -n Z:\\Torrents -t Windows` |
+
+The commands are kept free of inline comments, since `&::` in PowerShell and `#` in an
+interactive zsh (the macOS default) would be read as part of the command.
 
 ### Advanced: regex
 With `-r` / `--regex`, the existing and new paths are regex patterns. Capture groups are
 recommended. This example replaces `/some/test/with/a/path` with `/test/matched/path`:
 
 ```sh
-qbt_migrate -r -e '/some/(\w+)/.*$' -n '/\1/matched/path' -t Linux
-qbt_migrate --regex -e '/some/(\w+)/.*$' -n '/\1/matched/path' -t Linux
+qbt_migrate -r -e '/some/(\w+)/with/a/path' -n '/\1/matched/path' -t Linux
+qbt_migrate --regex -e '/some/(\w+)/with/a/path' -n '/\1/matched/path' -t Linux
 ```
+
+The pattern is applied to every path in the file, including renamed files
+(`mapped_files`). Avoid a trailing `.*$`: it swallows the rest of each path, so every
+file of a torrent would end up with the same path.
 
 Pass `-t` in regex mode. Without it, a `\1` in the new path can make auto-detect think the
 target is Windows, and the result is written with backslashes (`\test\matched\path`).
@@ -216,8 +228,9 @@ anything. `--ignore-running` overrides the check if you know better.
 > processes, so a qBittorrent running on the host is invisible to it. Close it yourself
 > when running via Docker.
 
-* **Desktop:** if qBittorrent is set to close to the notification area, closing the
-  window leaves it running. Use `File` -> `Exit` or quit from the tray icon.
+* **Desktop:** qBittorrent closes to the notification area by default
+  ([`CloseToTray` defaults to true](https://github.com/qbittorrent/qBittorrent/blob/master/src/base/preferences.cpp)),
+  so closing the window leaves it running. Use `File` -> `Exit` or quit from the tray icon.
 * **qBittorrent in Docker:** stop its container, for example
   `docker stop -t 60 qbittorrent`. Docker kills a container that has not exited after
   [10 seconds by default](https://docs.docker.com/reference/cli/docker/container/stop/),
@@ -274,9 +287,13 @@ resolves them:
 * Linux: `$XDG_DATA_HOME/qBittorrent/BT_backup` (`$HOME/.local/share` when unset),
   falling back to the pre-4.x `$XDG_DATA_HOME/data/qBittorrent/BT_backup` when only
   that one exists
-* Docker: `/config/qBittorrent/BT_backup`, checked first when running in a container
+* Docker: `/config/qBittorrent/BT_backup`, checked first when `qbt_migrate` itself runs
+  inside a container (for example inside a qBittorrent container). The `jslay88/qbt_migrate`
+  image does not use this: mount `BT_backup` at `/tmp/BT_backup` there, see
+  [Docker details](#docker-details).
 
-Run with `-l DEBUG` to see which candidates were checked and which one was picked.
+Run with `-l DEBUG` to see which path was picked, and, when none of them exists, which
+ones were checked.
 
 **qBittorrent itself running in Docker** (for example the
 [linuxserver image](https://docs.linuxserver.io/images/docker-qbittorrent/)): `BT_backup`
@@ -299,12 +316,16 @@ Most path problems come down to these:
   from a Linux/Mac shell. On Windows `cmd` and PowerShell a single `\` is fine.
 * **Trailing slashes.** Replacement is a plain substring swap, so the trailing slash has to
   match on both sides. `-e 'X:\' -n /torrents` will result in `/torrentsxxxxx`, not
-  `/torrents/xxxxx`. The correct pattern for this would be `-e X: -n /torrents` or
+  `/torrents/xxxxx`. The correct pattern for this would be `-e X: -n /torrents -t Linux` or
   `-e 'X:\' -n /torrents/`.
 * **Matches anywhere in the path.** The existing path is not only matched at the start:
   `-e /data -n /new` also turns `/srv/data/x` into `/srv/new/x`. Use a path that is
   specific enough, and check with `--dry-run`.
-* **Mixed separators** are handled for you: `-e 'S:\'` and `-e 'S:/'` find the same files.
+* **Mixed separators** in stored paths are matched for you: `-e 'S:\'` and `-e 'S:/'` find
+  the same files.
+* **Pass `-t` when moving between Windows and Linux/Mac.** Auto-detect only fires when one
+  path has `\` and the other has `/`. With `-e X:` or `-e 'S:/'` it does not, and the
+  rest of the path keeps its old separators (`/torrents\Torrents\movie`).
 
 Quoting per shell:
 
@@ -312,7 +333,7 @@ Quoting per shell:
 | --- | --- | --- |
 | bash, zsh (Linux/Mac) | `'X:\Torrents'` or `X:\\Torrents` | single quotes: `'/some/(\w+)/.*$'` |
 | PowerShell | `X:\Torrents` or `'X:\Torrents'` | single quotes, `(` is special unquoted |
-| cmd | `X:\Torrents`, no quotes needed | no quotes needed |
+| cmd | `X:\Torrents`, no quotes needed | no quotes needed, unless the pattern has `^ \| & < >`: then double quotes |
 
 In `cmd`, single quotes are passed through as part of the path, so leave them off. If a
 path has spaces, use double quotes and leave off a trailing `\` inside them:
@@ -330,19 +351,27 @@ so mount your `BT_backup` there.
 Add `-it` if you want to be prompted for anything you leave off. Without it, arguments you
 omit fall back to their defaults instead of prompting.
 
-For example, mounting in the default `BT_backup` path on a Windows machine running Docker:
+For example, mounting in the default `BT_backup` path on a Windows machine running Docker
+(`cmd`; in PowerShell write `$env:LOCALAPPDATA` instead of `%LOCALAPPDATA%`):
 
 ```bat
-docker run --rm -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\ -n Z:\
-docker run --rm -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows
+docker run --rm -v "%LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup" jslay88/qbt_migrate -e X:\ -n Z:\
+docker run --rm -v "%LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup" jslay88/qbt_migrate -e X:\Torrents -n X:\NewDir\Torrents -t Windows
 ```
 
-Mounting in the default `BT_backup` path on a Linux/Mac machine running Docker (Windows
+Mounting in the default `BT_backup` path on a Linux machine running Docker (Windows
 paths single-quoted, see [Paths and slashes](#paths-and-slashes)):
 
 ```sh
-docker run --rm -v $HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e 'X:\' -n 'Z:\'
-docker run --rm -v $HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup jslay88/qbt_migrate -e 'X:\Torrents' -n 'X:\NewDir\Torrents' -t Windows
+docker run --rm -v "$HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup" jslay88/qbt_migrate -e 'X:\' -n 'Z:\'
+docker run --rm -v "$HOME/.local/share/qBittorrent/BT_backup:/tmp/BT_backup" jslay88/qbt_migrate -e 'X:\Torrents' -n 'X:\NewDir\Torrents' -t Windows
+```
+
+On a Mac the default path is `$HOME/Library/Application Support/qBittorrent/BT_backup`;
+keep the quotes, it has a space:
+
+```sh
+docker run --rm -v "$HOME/Library/Application Support/qBittorrent/BT_backup:/tmp/BT_backup" jslay88/qbt_migrate -e 'X:\' -n 'Z:\'
 ```
 
 The examples under [Usage](#usage) work the same way: put the `qbt_migrate` arguments
@@ -358,7 +387,7 @@ will be mounting it.
 > `jslay88/qbt_migrate`. A `-e` after the image is `qbt_migrate`'s `--existing-path`.
 
 ```bat
-docker run --rm -v %LOCALAPPDATA%/qBittorrent/BT_backup:/opt/qbt_migrate/fastresume -e BT_BACKUP_PATH=/opt/qbt_migrate/fastresume jslay88/qbt_migrate -e X:\ -n Z:\
+docker run --rm -v "%LOCALAPPDATA%/qBittorrent/BT_backup:/opt/qbt_migrate/fastresume" -e BT_BACKUP_PATH=/opt/qbt_migrate/fastresume jslay88/qbt_migrate -e X:\ -n Z:\
 ```
 
 ### Building the image yourself
@@ -366,7 +395,7 @@ You can also clone this repository, build the image, and run your own built imag
 
 ```bat
 docker build . -t qbt_migrate
-docker run --rm -v %LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup qbt_migrate -e X:\ -n Z:\
+docker run --rm -v "%LOCALAPPDATA%/qBittorrent/BT_backup:/tmp/BT_backup" qbt_migrate -e X:\ -n Z:\
 ```
 
 ## Exit codes

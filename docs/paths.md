@@ -40,9 +40,13 @@ the separators of whatever platform wrote the file. A library that has moved
 between machines can have a mix, sometimes within a single `.fastresume`.
 
 You do not need to care. `qbt_migrate` matches your pattern against both
-conventions, so `-e 'S:\'` and `-e 'S:/'` find the same files and produce the
-same result. This was not true before 3.0, which is why older reports mention
-needing several passes ([#75](https://github.com/jslay88/qbt_migrate/issues/75)).
+conventions, so `-e 'S:\'` and `-e 'S:/'` find the same files. This was not
+true before 3.0, which is why older reports mention needing several passes
+([#75](https://github.com/jslay88/qbt_migrate/issues/75)).
+
+Pass `-t` when moving between Windows and Linux/Mac. Auto-detect only fires
+when one path has `\` and the other has `/`, so with `-e 'S:/' -n /mnt/s/` the
+rest of the path keeps its backslashes (`/mnt/s/Pictures\`).
 
 The replacement is idempotent. Running the same command twice changes nothing
 the second time. If a second run does find work, that is a bug worth reporting.
@@ -56,7 +60,7 @@ separators at the join, so the trailing slash has to match on both sides.
 | --- | --- | --- |
 | `-e 'X:\' -n /torrents` | `/torrentsTorrents/movie` | wrong |
 | `-e 'X:\' -n /torrents/` | `/torrents/Torrents/movie` | ok |
-| `-e 'X:' -n /torrents` | `/torrents/Torrents/movie` | ok |
+| `-e 'X:' -n /torrents -t Linux` | `/torrents/Torrents/movie` | ok |
 | `-e 'X:\Torrents' -n /torrents` | `/torrents/movie` | ok |
 
 Either put a trailing separator on both, or on neither.
