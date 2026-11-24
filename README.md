@@ -37,7 +37,7 @@ Install from PyPi using `pip`, or run with [Docker](#docker).
 
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
-    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-k] [--ignore-running] [-d] [-z]
+    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [--config-dir CONFIG_DIR] [-s] [-k] [--ignore-running] [-d] [-z]
                        [-l {DEBUG,INFO}] [-v]
 
     options:
@@ -51,6 +51,10 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
                             Target OS (converts slashes). Default will auto-detect if conversion is needed based on existing vs new.
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
                             BT_backup Path Override.
+      --config-dir CONFIG_DIR
+                            Also migrate qBittorrent's own settings in this directory: category save/incomplete paths in categories.json,
+                            and the default save and incomplete paths in qBittorrent.conf (qBittorrent.ini on Windows/Mac). Off unless given.
+                            Usually ~/.config/qBittorrent on Linux, %APPDATA%\qBittorrent on Windows, /config/qBittorrent in Docker images.
       -s, --skip-bad-files  Skips bad .fastresume files instead of exiting. Default behavior is to exit.
       -k, --stop-qbittorrent
                             Stop a running qBittorrent without asking first, and wait for it to exit.
@@ -109,6 +113,28 @@ Run with `-l DEBUG` to see which candidates were checked and which one was picke
 A backup zip archive is automatically created in the `BT_backup` directory. Pass `-z` /
 `--skip-backup` to skip it, which is worth doing when you already have one and are making
 a series of path changes over a large library, since zipping every run gets slow.
+
+### Category, default and incomplete paths
+Torrents using Automatic Torrent Management take their location from their category, and new
+torrents go to the default save path. Those live in qBittorrent's settings, not in the
+`.fastresume` files. Pass `--config-dir` to migrate them in the same run:
+
+    qbt_migrate -e /data -n /srv/media --config-dir ~/.config/qBittorrent
+
+This rewrites `save_path` and `download_path` of every category in `categories.json`, and
+`Session\DefaultSavePath` / `Session\TempPath` (plus the older `Downloads\SavePath` /
+`Downloads\TempPath`) in `qBittorrent.conf` or `qBittorrent.ini`, using the same matching as
+the torrents. In the `.conf` only the matching lines are edited and the rest is left byte for
+byte; `categories.json` is written back in qBittorrent's own JSON layout.
+`--dry-run` lists each setting that would change. Unless `-z` / `--skip-backup` is given, the
+files are added to the backup archive under `config/`. They are only written after every
+`.fastresume` file was updated, and the run stops before writing anything if one of them
+cannot be parsed or written.
+
+The config directory is not the one holding `BT_backup` on a desktop install:
+`~/.config/qBittorrent` on Linux, `%APPDATA%\qBittorrent` on Windows. In the common Docker
+images both are under `/config/qBittorrent`. With the `qbt_migrate` image, mount it and pass
+the mount point, e.g. `-v /path/to/config/qBittorrent:/qbt-config ... --config-dir /qbt-config`.
 
 ### Examples
 Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `/torrents` when coming from Linux/Mac

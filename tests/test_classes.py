@@ -106,7 +106,9 @@ def test_qbt_batch_move_run_create_backup_and_backup_folder(
         def __init__(self):
             self.called = False
 
-        def mock_create_backup(self, directory: str, archive: str):
+        def mock_create_backup(
+            self, directory: str, archive: str, extra_files=()
+        ):
             self.called = True
             directory = Path(directory)
             archive = Path(archive)

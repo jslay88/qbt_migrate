@@ -6,8 +6,9 @@ from pathlib import Path
 from bencodepy.exceptions import BencodeDecodeError
 
 from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
+from qbt_migrate.config import ConfigEdit, apply_config, plan_config
 from qbt_migrate.enums import TargetOS
-from qbt_migrate.exceptions import FastResumeUpdateError
+from qbt_migrate.exceptions import ConfigError, FastResumeUpdateError
 from qbt_migrate.plans import MigrationPlan, PlanSummary
 from qbt_migrate.process import find_processes, stop_processes
 
@@ -46,6 +47,15 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         "--bt-backup-path",
         help="BT_backup Path Override. "
         f"Default is {discover_bt_backup_path()}",
+    )
+    parser.add_argument(
+        "--config-dir",
+        help="Also migrate qBittorrent's own settings in this directory: "
+        "category save/incomplete paths in categories.json, and the default "
+        "save and incomplete paths in qBittorrent.conf (qBittorrent.ini on "
+        "Windows/Mac). Off unless given. Usually ~/.config/qBittorrent on "
+        "Linux, %%APPDATA%%\\qBittorrent on Windows, /config/qBittorrent in "
+        "Docker images.",
     )
     parser.add_argument(
         "-s",
@@ -119,6 +129,12 @@ BAD_FILE_HINT = (
 BAD_BACKUP_PATH_HINT = (
     "❌ BT_backup path is not a directory: {error}\n"
     "Point -b/--bt-backup-path at your qBittorrent BT_backup folder."
+)
+
+BAD_CONFIG_HINT = (
+    "❌ {error}\n"
+    "Nothing was changed. Fix or move the file, or leave out --config-dir to "
+    "migrate only the .fastresume files."
 )
 
 INTERACTIVE_ONLY_HINT = (
@@ -211,6 +227,35 @@ def log_plan_summary(summary: PlanSummary, verbose: bool) -> None:
         f"{f', {unchanged} already match' if unchanged else ''}"
         f"{f', {len(summary.failing)} would fail' if summary.failing else ''}."
         f" Nothing was written."
+    )
+
+
+def log_config_plan(edits: list[ConfigEdit]) -> None:
+    """Log each config setting that would change, quoted like the rest."""
+    count = 0
+    for edit in edits:
+        for change in edit.changes:
+            logger.info(
+                f"{edit.file_path.name}  {change.key}  "
+                f"{quoted(change.old)} -> {quoted(change.new)}"
+            )
+            count += 1
+    logger.info(
+        f"{'🔍' if count else '⚠️'} {count} qBittorrent setting"
+        f"{'' if count == 1 else 's'} would be updated. Nothing was written."
+    )
+
+
+def plan_config_dir(args: argparse.Namespace) -> list[ConfigEdit]:
+    """Plan the --config-dir edits, or nothing when it was not given."""
+    if args.config_dir is None:
+        return []
+    return plan_config(
+        Path(args.config_dir.strip()),
+        args.existing_path,
+        args.new_path,
+        args.regex,
+        args.target_os,
     )
 
 
@@ -336,6 +381,7 @@ def preview_migration(
     qbm: QBTBatchMove, args: argparse.Namespace
 ) -> int | None:
     try:
+        edits = plan_config_dir(args)
         summary = qbm.plan(
             args.existing_path,
             args.new_path,
@@ -343,6 +389,9 @@ def preview_migration(
             args.target_os,
             args.skip_bad_files,
         )
+    except ConfigError as e:
+        logger.error(BAD_CONFIG_HINT.format(error=e))
+        return 1
     except (BencodeDecodeError, ValueError) as e:
         logger.error(BAD_FILE_HINT.format(error=e))
         return 1
@@ -350,6 +399,8 @@ def preview_migration(
         logger.error(BAD_BACKUP_PATH_HINT.format(error=e))
         return 2
     log_plan_summary(summary, verbose=args.log_level == "DEBUG")
+    if args.config_dir is not None:
+        log_config_plan(edits)
     return None
 
 
@@ -359,6 +410,9 @@ def apply_migration(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
             "⚠️ Skipping the backup archive. Make sure you have one already."
         )
     try:
+        # Planned first, so a config file that cannot be parsed stops the run
+        # before any .fastresume is touched.
+        edits = plan_config_dir(args)
         qbm.run(
             args.existing_path,
             args.new_path,
@@ -366,7 +420,11 @@ def apply_migration(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
             args.target_os,
             not args.skip_backup,
             args.skip_bad_files,
+            backup_extra_files=[edit.file_path for edit in edits],
         )
+    except ConfigError as e:
+        logger.error(BAD_CONFIG_HINT.format(error=e))
+        return 1
     except (BencodeDecodeError, ValueError) as e:
         logger.error(BAD_FILE_HINT.format(error=e))
         return 1
@@ -379,8 +437,40 @@ def apply_migration(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
             f"qBittorrent will still have the old paths for them. "
             f"Restore from the backup archive in the BT_backup directory "
             f"if you need to start over."
+            f"{' qBittorrent settings were not changed.' if edits else ''}"
         )
         return 1
+    return write_config(edits, backed_up=not args.skip_backup)
+
+
+def write_config(
+    edits: list[ConfigEdit], backed_up: bool = True
+) -> int | None:
+    """Write the planned config edits, after the fastresume files succeeded.
+
+    Settings are only changed once every torrent moved, so a partial run never
+    leaves categories pointing somewhere the torrents are not.
+    """
+    if not edits:
+        return None
+    try:
+        written = apply_config(edits)
+    except ConfigError as e:
+        # Only reachable for failures the planning checks cannot foresee,
+        # such as a full disk. Point at the backup only if one was made.
+        recovery = (
+            "Restore the settings from the backup archive's config/ folder, "
+            "or fix the paths in qBittorrent's options."
+            if backed_up
+            else "No backup archive was made (--skip-backup), so fix the "
+            "paths in qBittorrent's options."
+        )
+        logger.error(f"❌ {e}\nThe .fastresume files were updated. {recovery}")
+        return 1
+    logger.info(
+        f"{'✔️' if written else '⚠️'} Updated {written} qBittorrent settings "
+        f"file{'' if written == 1 else 's'}."
+    )
     return None
 
 
@@ -408,6 +498,13 @@ def main() -> int | None:
         if not value:
             logger.error(f"❌ {name} is required. {INTERACTIVE_ONLY_HINT}")
             return 2
+
+    # Path("") is the current directory, which is never what was meant.
+    if args.config_dir is not None and not args.config_dir.strip():
+        logger.error(
+            "❌ --config-dir is empty. Give qBittorrent's config dir."
+        )
+        return 2
 
     args.regex = resolve_regex(args.regex)
     args.target_os = resolve_target_os(

@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path
 
 from qbt_migrate.enums import TargetOS
@@ -14,6 +15,7 @@ def backup_folder(
     folder_path: str | Path,
     archive_path: str | Path,
     include_torrents: bool = True,
+    extra_files: Iterable[Path] = (),
 ) -> None:
     logger.info(f"🗄️ Creating Archive {archive_path} ...")
     folder_path = Path(folder_path)
@@ -29,6 +31,11 @@ def backup_folder(
                 # digging the files out of a nested directory tree that
                 # mirrored the machine the backup was taken on.
                 archive.write(file, arcname=file.name)
+        # qBittorrent's settings files, when they are being migrated too.
+        # Kept apart so restoring BT_backup cannot overwrite them by accident.
+        for file in extra_files:
+            logger.debug(f"Archiving {file} into {archive_path}...")
+            archive.write(file, arcname=f"config/{file.name}")
     logger.info("✔️ Done!")
 
 
