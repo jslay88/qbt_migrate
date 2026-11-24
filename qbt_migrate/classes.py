@@ -1,8 +1,9 @@
 import logging
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from copy import copy, deepcopy
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -16,11 +17,17 @@ from qbt_migrate.methods import (
     backup_folder,
     convert_slashes,
     discover_bt_backup_path,
+    first_match,
+    map_path,
     matches_path,
-    replace_path,
 )
 from qbt_migrate.names import torrent_name
-from qbt_migrate.plans import MigrationPlan, PlanSummary, diff_data
+from qbt_migrate.plans import (
+    MAPPED_FILES_KEY,
+    MigrationPlan,
+    PlanSummary,
+    diff_data,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -46,6 +53,7 @@ class QBTBatchMove:
         create_backup: bool = True,
         skip_bad_files: bool = False,
         max_workers: int | None = None,
+        extra_mappings: Sequence[tuple[str, str]] = (),
     ) -> None:
         """
         Perform Batch Processing of path changes.
@@ -67,6 +75,10 @@ class QBTBatchMove:
         :param max_workers: Size of the thread pool used to write files.
         Defaults to `ThreadPoolExecutor`'s own default.
         :type max_workers: int
+        :param extra_mappings: More (existing, new) pairs, tried in order
+        after `existing_path`/`new_path`. Each path value is rewritten by the
+        first pair that matches it, once.
+        :type extra_mappings: Sequence[tuple[str, str]]
         :raises FastResumeUpdateError: If any discovered file failed to update.
         """
         if not self.bt_backup_path.is_dir():
@@ -80,8 +92,12 @@ class QBTBatchMove:
                 self.bt_backup_path, self.bt_backup_path / backup_filename
             )
 
+        # Discovery only needs the existing halves; a file is relevant if any
+        # of them matches, so one pass over BT_backup serves every mapping.
+        extra_paths = [existing for existing, _ in extra_mappings]
         self.logger.info(
-            f"🕵️ Searching for .fastresume files with path {existing_path} ..."
+            f"🕵️ Searching for .fastresume files with path "
+            f"{', '.join([existing_path, *extra_paths])} ..."
         )
         failures: dict[Path, BaseException] = {}
         count = 0
@@ -92,6 +108,7 @@ class QBTBatchMove:
                 existing_path,
                 regex_path,
                 not skip_bad_files,
+                extra_paths,
             ):
                 count += 1
                 self.discovered_files.add(fast_resume)
@@ -104,6 +121,7 @@ class QBTBatchMove:
                         target_os,
                         True,
                         False,
+                        extra_mappings,
                     )
                 ] = fast_resume
             for future in as_completed(futures):
@@ -133,6 +151,7 @@ class QBTBatchMove:
         regex_path: bool = False,
         target_os: TargetOS | None = None,
         skip_bad_files: bool = False,
+        extra_mappings: Sequence[tuple[str, str]] = (),
     ) -> PlanSummary:
         """Work out what `run` would change, writing nothing.
 
@@ -144,9 +163,10 @@ class QBTBatchMove:
         if not self.bt_backup_path.is_dir():
             raise NotADirectoryError(self.bt_backup_path)
 
+        extra_paths = [existing for existing, _ in extra_mappings]
         self.logger.info(
             f"🔍 Dry run. Searching for .fastresume files with path "
-            f"{existing_path} ..."
+            f"{', '.join([existing_path, *extra_paths])} ..."
         )
         summary = PlanSummary()
         for fast_resume in self.discover_relevant_fast_resume(
@@ -154,11 +174,16 @@ class QBTBatchMove:
             existing_path,
             regex_path,
             not skip_bad_files,
+            extra_paths,
         ):
             try:
                 summary.plans.append(
                     fast_resume.plan_paths(
-                        existing_path, new_path, regex_path, target_os
+                        existing_path,
+                        new_path,
+                        regex_path,
+                        target_os,
+                        extra_mappings,
                     )
                 )
             except Exception as e:  # noqa: BLE001
@@ -181,6 +206,7 @@ class QBTBatchMove:
         existing_path: str,
         regex_path: bool = False,
         raise_on_error: bool = True,
+        extra_paths: Sequence[str] = (),
     ) -> Iterator["FastResume"]:
         """
         Find .fastresume files that contain the existing path.
@@ -192,6 +218,9 @@ class QBTBatchMove:
         :type: bool
         :param raise_on_error: Raise if error parsing .fastresume files
         :type raise_on_error: bool
+        :param extra_paths: More existing paths. A file is relevant when any
+        of them, or `existing_path`, matches.
+        :type extra_paths: Sequence[str]
         :return: List of FastResume Objects
         :rtype: list[FastResume]
         """
@@ -218,23 +247,9 @@ class QBTBatchMove:
                         f"⚠️ Unable to parse {file}. Skipping!\n\n{e}"
                     )
                     continue
-                if (
-                    fast_resume.save_path is not None
-                    and matches_path(fast_resume.save_path, existing_path)
-                ) or (
-                    fast_resume.qbt_save_path is not None
-                    and matches_path(fast_resume.qbt_save_path, existing_path)
-                ):
-                    yield fast_resume
-                elif regex_path and (
-                    (
-                        fast_resume.save_path is not None
-                        and re.search(existing_path, fast_resume.save_path)
-                    )
-                    or (
-                        fast_resume.qbt_save_path is not None
-                        and re.search(existing_path, fast_resume.qbt_save_path)
-                    )
+                if any(
+                    cls._is_relevant(fast_resume, path, regex_path)
+                    for path in (existing_path, *extra_paths)
                 ):
                     yield fast_resume
                 else:
@@ -244,6 +259,30 @@ class QBTBatchMove:
                         f"qBt-savePath: {fast_resume.qbt_save_path}"
                     )
         return
+
+    @staticmethod
+    def _is_relevant(
+        fast_resume: "FastResume", existing_path: str, regex_path: bool
+    ) -> bool:
+        """Does `existing_path` match this file's save path?"""
+        if (
+            fast_resume.save_path is not None
+            and matches_path(fast_resume.save_path, existing_path)
+        ) or (
+            fast_resume.qbt_save_path is not None
+            and matches_path(fast_resume.qbt_save_path, existing_path)
+        ):
+            return True
+        return regex_path and bool(
+            (
+                fast_resume.save_path is not None
+                and re.search(existing_path, fast_resume.save_path)
+            )
+            or (
+                fast_resume.qbt_save_path is not None
+                and re.search(existing_path, fast_resume.qbt_save_path)
+            )
+        )
 
     @classmethod
     def backup_folder(
@@ -428,6 +467,7 @@ class FastResume:
         new_path: str,
         regex_path: bool = False,
         target_os: TargetOS | None = None,
+        extra_mappings: Sequence[tuple[str, str]] = (),
     ) -> MigrationPlan:
         """What `replace_paths` would change here, without changing anything.
 
@@ -449,8 +489,40 @@ class FastResume:
             target_os,
             save_file=False,
             create_backup=False,
+            extra_mappings=extra_mappings,
         )
-        return diff_data(self.file_path, self._data, probe._data)
+        plan = diff_data(self.file_path, self._data, probe._data)
+        if not extra_mappings:
+            return plan
+        # Name the mappings behind each change, using the same first-match
+        # rule the replacement used. A list change can use several, one per
+        # entry, so every changed entry is looked at, not only the example.
+        existing_paths = [existing_path, *(e for e, _ in extra_mappings)]
+
+        def used(key: str, old: str) -> tuple[int, ...]:
+            olds = (
+                [
+                    entry
+                    for entry, new in zip(
+                        self.mapped_files or [],
+                        probe.mapped_files or [],
+                        strict=True,
+                    )
+                    if entry != new
+                ]
+                if key == MAPPED_FILES_KEY
+                else [old]
+            )
+            found = (first_match(o, existing_paths, regex_path) for o in olds)
+            return tuple(sorted({i for i in found if i is not None}))
+
+        return replace(
+            plan,
+            changes=tuple(
+                replace(change, mappings=used(change.key, change.old))
+                for change in plan.changes
+            ),
+        )
 
     def replace_paths(
         self,
@@ -460,7 +532,13 @@ class FastResume:
         target_os: TargetOS | None = None,
         save_file: bool = True,
         create_backup: bool = True,
+        extra_mappings: Sequence[tuple[str, str]] = (),
     ) -> None:
+        """Rewrite every path key, saving unless told not to.
+
+        `extra_mappings` are tried after `existing_path`/`new_path`; each
+        value is rewritten by the first pair that matches it, once.
+        """
         self.logger.debug(f"Replacing Paths in FastResume {self.file_path}...")
         self.logger.debug(f"Existing Path: {existing_path}")
         self.logger.debug(f"New Path: {new_path}")
@@ -468,24 +546,34 @@ class FastResume:
         self.logger.debug(f"Target OS: {target_os}")
         self.logger.debug(f"Save File: {save_file}")
         self.logger.debug(f"Create Backup: {create_backup}")
+        self.logger.debug(f"Extra Mappings: {extra_mappings}")
+        # -e/-n is always the first mapping, so a single-pair call goes through
+        # exactly the same code with a list of one.
+        mappings = [(existing_path, new_path), *extra_mappings]
         if regex_path:
             new_save_path = None
             new_qbt_save_path = None
             new_qbt_download_path = None
-            pattern = re.compile(existing_path)
+            # Compiled up front, as on master, so a bad pattern raises even
+            # for a file with no path keys to substitute in.
+            for pattern, _ in mappings:
+                re.compile(pattern)
             if self.save_path:
-                new_save_path = pattern.sub(new_path, self.save_path)
+                new_save_path = map_path(self.save_path, mappings, True)
             if self.qbt_save_path:
-                new_qbt_save_path = pattern.sub(new_path, self.qbt_save_path)
+                new_qbt_save_path = map_path(
+                    self.qbt_save_path, mappings, True
+                )
                 if not self.save_path:
                     new_save_path = new_qbt_save_path
             if self.qbt_download_path:
-                new_qbt_download_path = pattern.sub(
-                    new_path, self.qbt_download_path
+                new_qbt_download_path = map_path(
+                    self.qbt_download_path, mappings, True
                 )
             if self.mapped_files:
                 self._data["mapped_files"] = [
-                    pattern.sub(new_path, path) for path in self.mapped_files
+                    map_path(path, mappings, True)
+                    for path in self.mapped_files
                 ]
         else:
             # Every key is matched the same way. Assuming a separator
@@ -493,17 +581,17 @@ class FastResume:
             # fastresume did not happen to use it, leaving the old drive letter
             # in place. See #75.
             new_save_path = (
-                replace_path(self.save_path, existing_path, new_path)
+                map_path(self.save_path, mappings)
                 if self.save_path is not None
                 else None
             )
             new_qbt_save_path = (
-                replace_path(self.qbt_save_path, existing_path, new_path)
+                map_path(self.qbt_save_path, mappings)
                 if self.qbt_save_path is not None
                 else None
             )
             new_qbt_download_path = (
-                replace_path(self.qbt_download_path, existing_path, new_path)
+                map_path(self.qbt_download_path, mappings)
                 if self.qbt_download_path is not None
                 else None
             )
@@ -511,8 +599,7 @@ class FastResume:
                 new_save_path = new_qbt_save_path
             if self.mapped_files:
                 self._data["mapped_files"] = [
-                    replace_path(path, existing_path, new_path)
-                    for path in self.mapped_files
+                    map_path(path, mappings) for path in self.mapped_files
                 ]
         self.logger.debug(
             f"Existing Save Path: {existing_path}, New Save Path: {new_path}, "

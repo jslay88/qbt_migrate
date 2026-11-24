@@ -37,7 +37,7 @@ Install from PyPi using `pip`, or run with [Docker](#docker).
 
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
-    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-k] [--ignore-running] [-d] [-z]
+    usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-m EXISTING NEW] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-k] [--ignore-running] [-d] [-z]
                        [-l {DEBUG,INFO}] [-v]
 
     options:
@@ -46,9 +46,11 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
                             Existing root of path to look for.
       -n NEW_PATH, --new-path NEW_PATH
                             New root path to replace existing root path with.
+      -m EXISTING NEW, --map EXISTING NEW
+                            Replace EXISTING with NEW. Repeatable, for several roots in one run. Each path uses the first mapping that matches it, once, so mappings never chain. -e/-n, if given, is tried first.
       -r, --regex           Existing and New paths are regex patterns. (Capture groups recommended).
       -t {Windows,Linux,Mac}, --target-os {Windows,Linux,Mac}
-                            Target OS (converts slashes). Default will auto-detect if conversion is needed based on existing vs new.
+                            Target OS (converts slashes). Default will auto-detect if conversion is needed based on existing vs new, over every mapping.
       -b BT_BACKUP_PATH, --bt-backup-path BT_BACKUP_PATH
                             BT_backup Path Override.
       -s, --skip-bad-files  Skips bad .fastresume files instead of exiting. Default behavior is to exit.
@@ -87,7 +89,7 @@ of them.
 Anything not passed as an argument is prompted for. When nothing is attached to stdin
 (a container without `-it`, cron, a shell script), `qbt_migrate` does not prompt: it uses
 the defaults it can (platform `BT_backup` path, no regex, target OS auto-detected) and
-exits with a message naming the argument if `-e` or `-n` is missing.
+exits with a message naming the argument if `-e` or `-n` is missing and no `-m` is given.
 
 Exit codes: `0` success, `1` one or more `.fastresume` files could not be read or updated,
 `2` bad or missing arguments.
@@ -131,6 +133,10 @@ If paths are not being replaced the way you expect, read that first.**
     qbt_migrate -e /torrents -n /new/path/for/torrents  # Changes torrent root path on Linux/Mac
     qbt_migrate -e /torrents -n Z:\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)
     qbt_migrate -e /torrents -n Z:\\Torrents -t Windows  # Linux/Mac to Windows (converts slashes)  # When running on Linux machine \\ is needed for Windows Paths
+
+    # Several roots in one run, one backup. Each path uses the first -m that matches it, so order the more specific first.
+    qbt_migrate -m /data/movies /srv/media/movies -m /data/tv /srv/media/tv
+    qbt_migrate -m D: /srv/media/movies -m E: /srv/media/tv -t Linux  # Two Windows drives to two Linux shares (converts slashes)
 
     # Adavanced Usage with RegEx
     # Example would replace /some/test/with/a/path with /test/matched/path

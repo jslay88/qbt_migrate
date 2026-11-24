@@ -8,6 +8,7 @@ from bencodepy.exceptions import BencodeDecodeError
 from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
 from qbt_migrate.enums import TargetOS
 from qbt_migrate.exceptions import FastResumeUpdateError
+from qbt_migrate.methods import matches_path
 from qbt_migrate.plans import MigrationPlan, PlanSummary
 from qbt_migrate.process import find_processes, stop_processes
 
@@ -26,6 +27,19 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         help="New root path to replace existing root path with.",
     )
     parser.add_argument(
+        "-m",
+        "--map",
+        help="Replace EXISTING with NEW. Repeatable, for several roots in "
+        "one run. Each path uses the first mapping that matches it, once, "
+        "so mappings never chain: put narrower roots first. -e/-n, if "
+        "given, is tried first.",
+        action="append",
+        nargs=2,
+        metavar=("EXISTING", "NEW"),
+        dest="mappings",
+        default=None,
+    )
+    parser.add_argument(
         "-r",
         "--regex",
         help="Existing and New paths are regex patterns. "
@@ -38,7 +52,7 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         "--target-os",
         help="Target OS (converts slashes). "
         "Default will auto-detect if conversion is needed "
-        "based on existing vs new.",
+        "based on existing vs new, over every mapping.",
         choices=["Windows", "Linux", "Mac"],
     )
     parser.add_argument(
@@ -180,6 +194,10 @@ def log_plan(plan: MigrationPlan) -> None:
         return
     for change in plan.changes:
         arrow = f"{quoted(change.old)} -> {quoted(change.new)}"
+        if change.mappings:
+            numbers = ", ".join(str(index + 1) for index in change.mappings)
+            plural = "s" if len(change.mappings) > 1 else ""
+            arrow += f"  (mapping{plural} {numbers})"
         if change.is_list:
             logger.info(
                 f"    {change.key:16}  {change.changed_entries} of "
@@ -302,9 +320,25 @@ def resolve_regex(regex: bool | None) -> bool:
     return answer in ("y", "yes")
 
 
+def detect_target_os(existing_path: str, new_path: str) -> TargetOS | None:
+    """Infer a target OS from the separators one mapping uses."""
+    if "/" in existing_path and "\\" in new_path:
+        return TargetOS.WINDOWS
+    if "\\" in existing_path and "/" in new_path:
+        return TargetOS.POSIX
+    return None
+
+
 def resolve_target_os(
-    target_os: str | None, existing_path: str, new_path: str
+    target_os: str | None,
+    existing_path: str,
+    new_path: str,
+    extra_mappings: list[tuple[str, str]] | None = None,
 ) -> TargetOS | None:
+    """The target OS from -t, the prompt, or the separators in use.
+
+    :raises ValueError: If auto-detecting and the mappings disagree.
+    """
     if target_os is None:
         target_os = prompt_until(
             "Target OS (Windows, Linux, Mac, Blank for auto-detect): ",
@@ -318,18 +352,117 @@ def resolve_target_os(
             else TargetOS.POSIX
         )
     # Blank, or nobody to ask. Infer from the separators in use.
-    if "/" in existing_path and "\\" in new_path:
+    mappings = [(existing_path, new_path), *(extra_mappings or [])]
+    detected = {
+        found
+        for found in (detect_target_os(e, n) for e, n in mappings)
+        if found is not None
+    }
+    if len(detected) > 1:
+        raise ValueError(
+            "The mappings disagree on the target OS: some go to Windows, "
+            "some to Linux/Mac. Pass -t/--target-os to choose one."
+        )
+    if TargetOS.WINDOWS in detected:
         logger.info(
             "Auto detected target OS change. Will convert slashes to Windows."
         )
         return TargetOS.WINDOWS
-    if "\\" in existing_path and "/" in new_path:
+    if TargetOS.POSIX in detected:
         logger.info(
             "Auto detected target OS change. "
             "Will convert slashes to Linux/Mac."
         )
         return TargetOS.POSIX
     return None
+
+
+def resolve_mappings(args: argparse.Namespace) -> str | None:
+    """Fold -m/--map into -e/-n plus `args.extra_mappings`.
+
+    The first mapping always lives in -e/-n, so the single-pair code path is
+    the one every run takes. Returns an error message, or None.
+    """
+    args.extra_mappings = [
+        (existing, new) for existing, new in args.mappings or []
+    ]
+    if not args.extra_mappings:
+        return None
+    if (args.existing_path is None) != (args.new_path is None):
+        return (
+            "-e/--existing-path and -n/--new-path go together. With "
+            "-m/--map, give both or neither."
+        )
+    # From Python 3.12 argparse accepts an option-like word as a value of an
+    # nargs=2 option, so a forgotten NEW silently swallows the next flag:
+    # `-m /data/movies -d` maps to '-d' and writes instead of dry-running.
+    # 3.10 and 3.11 reject it themselves; -e/-n do on every version.
+    for value in (v for pair in args.extra_mappings for v in pair):
+        if value.startswith("-"):
+            return (
+                f"-m/--map takes EXISTING NEW, and {quoted(value)} looks "
+                f"like an option. Did you leave out NEW? Paths given to "
+                f"-m cannot start with '-'."
+            )
+    # An empty EXISTING is a substring of every path and would match them all.
+    if any(not existing or not new for existing, new in args.extra_mappings):
+        return "-m/--map needs a non-empty EXISTING and NEW."
+    if args.existing_path is None:
+        args.existing_path, args.new_path = args.extra_mappings.pop(0)
+    return None
+
+
+def unreachable_mapping(
+    mappings: list[tuple[str, str]], regex_path: bool
+) -> str | None:
+    """Explain a mapping that can never apply, or None.
+
+    Any path containing a later EXISTING that contains an earlier one is
+    claimed by the earlier mapping first, so the later one is dead and its
+    torrents land under the wrong NEW. That is never what was meant, so it
+    stops the run rather than warns. Regex patterns are not compared.
+    """
+    if regex_path:
+        return None
+    for later, (existing, _) in enumerate(mappings):
+        for earlier in range(later):
+            if matches_path(existing, mappings[earlier][0]):
+                return (
+                    f"Mapping {later + 1} {quoted(existing)} can never "
+                    f"match: mapping {earlier + 1} "
+                    f"{quoted(mappings[earlier][0])} takes every path it "
+                    f"would. Put the narrower root first (-e/-n is always "
+                    f"first)."
+                )
+    return None
+
+
+def resolve_mapping_options(args: argparse.Namespace) -> str | None:
+    """Settle the target OS and check the mappings. An error, or None."""
+    mappings = [(args.existing_path, args.new_path), *args.extra_mappings]
+    unreachable = unreachable_mapping(mappings, args.regex)
+    if unreachable is not None:
+        return unreachable
+    try:
+        args.target_os = resolve_target_os(
+            args.target_os,
+            args.existing_path,
+            args.new_path,
+            args.extra_mappings,
+        )
+    except ValueError as e:
+        return str(e)
+    return None
+
+
+def log_mappings(args: argparse.Namespace) -> None:
+    """Number the mappings, so dry run lines can refer back to them."""
+    if not args.extra_mappings:
+        return
+    logger.info("Mappings, first match wins:")
+    mappings = [(args.existing_path, args.new_path), *args.extra_mappings]
+    for number, (existing, new) in enumerate(mappings, start=1):
+        logger.info(f"    {number}: {quoted(existing)} -> {quoted(new)}")
 
 
 def preview_migration(
@@ -342,6 +475,7 @@ def preview_migration(
             args.regex,
             args.target_os,
             args.skip_bad_files,
+            args.extra_mappings,
         )
     except (BencodeDecodeError, ValueError) as e:
         logger.error(BAD_FILE_HINT.format(error=e))
@@ -366,6 +500,7 @@ def apply_migration(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
             args.target_os,
             not args.skip_backup,
             args.skip_bad_files,
+            extra_mappings=args.extra_mappings,
         )
     except (BencodeDecodeError, ValueError) as e:
         logger.error(BAD_FILE_HINT.format(error=e))
@@ -393,6 +528,11 @@ def main() -> int | None:
         logger.debug("Exiting")
         return None
 
+    mapping_error = resolve_mappings(args)
+    if mapping_error is not None:
+        logger.error(f"❌ {mapping_error}")
+        return 2
+
     qbm = QBTBatchMove()
     qbm.bt_backup_path = resolve_bt_backup_path(
         args.bt_backup_path, qbm.bt_backup_path
@@ -410,15 +550,18 @@ def main() -> int | None:
             return 2
 
     args.regex = resolve_regex(args.regex)
-    args.target_os = resolve_target_os(
-        args.target_os, args.existing_path, args.new_path
-    )
+    option_error = resolve_mapping_options(args)
+    if option_error is not None:
+        logger.error(f"❌ {option_error}")
+        return 2
 
     logger.debug(
         f"Existing Path: {args.existing_path}, New Path: {args.new_path}, "
         f"Target OS: {args.target_os}, Skip Bad Files: {args.skip_bad_files}, "
-        f"Skip Backup: {args.skip_backup}, Dry Run: {args.dry_run}"
+        f"Skip Backup: {args.skip_backup}, Dry Run: {args.dry_run}, "
+        f"Extra Mappings: {args.extra_mappings}"
     )
+    log_mappings(args)
     # A dry run writes nothing, so it is safe with qBittorrent open and is the
     # obvious thing to reach for while deciding on a pattern.
     if args.dry_run:

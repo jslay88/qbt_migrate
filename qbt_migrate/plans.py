@@ -22,6 +22,10 @@ class PathChange:
     # that changes, as an example, rather than the whole list.
     changed_entries: int | None = None
     total_entries: int | None = None
+    # Indexes of the mappings behind this change when several were given:
+    # one for a single key, every one used across a `mapped_files` list.
+    # Empty with a single mapping, or when only separators changed.
+    mappings: tuple[int, ...] = ()
 
     @property
     def is_list(self) -> bool:
