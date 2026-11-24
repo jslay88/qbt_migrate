@@ -3,7 +3,11 @@
 import logging
 
 from qbt_migrate.classes import FastResume, QBTBatchMove
-from qbt_migrate.exceptions import FastResumeUpdateError, QBTMigrateError
+from qbt_migrate.exceptions import (
+    ConfigError,
+    FastResumeUpdateError,
+    QBTMigrateError,
+)
 from qbt_migrate.methods import convert_slashes, discover_bt_backup_path
 from qbt_migrate.plans import MigrationPlan, PathChange, PlanSummary
 
@@ -14,6 +18,7 @@ from qbt_migrate.plans import MigrationPlan, PathChange, PlanSummary
 __version__ = "3.3.0"
 
 __all__ = [
+    "ConfigError",
     "FastResume",
     "FastResumeUpdateError",
     "MigrationPlan",

@@ -1,6 +1,6 @@
 import logging
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from copy import copy, deepcopy
 from datetime import datetime
@@ -46,6 +46,7 @@ class QBTBatchMove:
         create_backup: bool = True,
         skip_bad_files: bool = False,
         max_workers: int | None = None,
+        backup_extra_files: Iterable[Path] = (),
     ) -> None:
         """
         Perform Batch Processing of path changes.
@@ -67,6 +68,9 @@ class QBTBatchMove:
         :param max_workers: Size of the thread pool used to write files.
         Defaults to `ThreadPoolExecutor`'s own default.
         :type max_workers: int
+        :param backup_extra_files: Further files to put in the backup archive,
+        under `config/`.
+        :type backup_extra_files: Iterable[Path]
         :raises FastResumeUpdateError: If any discovered file failed to update.
         """
         if not self.bt_backup_path.is_dir():
@@ -77,7 +81,9 @@ class QBTBatchMove:
                 f"{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
             )
             backup_folder(
-                self.bt_backup_path, self.bt_backup_path / backup_filename
+                self.bt_backup_path,
+                self.bt_backup_path / backup_filename,
+                extra_files=backup_extra_files,
             )
 
         self.logger.info(

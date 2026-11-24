@@ -21,3 +21,7 @@ class FastResumeUpdateError(QBTMigrateError):
             f"{len(failures)} .fastresume file(s) could not be updated: "
             f"{names}"
         )
+
+
+class ConfigError(QBTMigrateError):
+    """A qBittorrent config file could not be read, parsed or written."""
