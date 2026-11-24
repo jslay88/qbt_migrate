@@ -6,6 +6,11 @@ from pathlib import Path
 from bencodepy.exceptions import BencodeDecodeError
 
 from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
+from qbt_migrate.downgrade import (
+    DowngradeSummary,
+    downgrade_resume,
+    sqlite_resume_data,
+)
 from qbt_migrate.enums import TargetOS
 from qbt_migrate.exceptions import FastResumeUpdateError
 from qbt_migrate.plans import MigrationPlan, PlanSummary
@@ -91,6 +96,16 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--downgrade-resume",
+        help="Instead of changing paths, convert libtorrent 2.1 resume data "
+        "(file-version 2) to the format libtorrent 1.2 reads, so a "
+        "qBittorrent lt12 build does not recheck every torrent. "
+        "Cannot be combined with -e, -n, -r or -t.",
+        action="store_true",
+        default=False,
+    )
+
+    parser.add_argument(
         "-l",
         "--log-level",
         help="Log Level, Default is INFO.",
@@ -119,6 +134,17 @@ BAD_FILE_HINT = (
 BAD_BACKUP_PATH_HINT = (
     "❌ BT_backup path is not a directory: {error}\n"
     "Point -b/--bt-backup-path at your qBittorrent BT_backup folder."
+)
+
+SQLITE_DOWNGRADE_HINT = (
+    "❌ Found {database}: qBittorrent keeps resume data in an SQLite "
+    "database and loads torrents from it on its next start, so converting "
+    "the .fastresume files would have no effect.\n"
+    "Nothing was changed. While still on the libtorrent 2.1 build, set "
+    'Options -> Advanced -> Resume data storage type to "Fastresume files", '
+    "start qBittorrent once so it writes the .fastresume files and removes "
+    "torrents.db, quit it, then run --downgrade-resume before starting the "
+    "libtorrent 1.2 build."
 )
 
 INTERACTIVE_ONLY_HINT = (
@@ -189,7 +215,8 @@ def log_plan(plan: MigrationPlan) -> None:
             logger.info(f"    {change.key:16}  {arrow}")
 
 
-def log_plan_summary(summary: PlanSummary, verbose: bool) -> None:
+def log_plan_details(summary: PlanSummary, verbose: bool) -> None:
+    """Each changing file, up to the limit, then each failing one."""
     changing = summary.changing
     shown = changing if verbose else changing[:DRY_RUN_DETAIL_LIMIT]
     for plan in shown:
@@ -203,6 +230,10 @@ def log_plan_summary(summary: PlanSummary, verbose: bool) -> None:
     for plan in summary.failing:
         log_plan(plan)
 
+
+def log_plan_summary(summary: PlanSummary, verbose: bool) -> None:
+    log_plan_details(summary, verbose)
+    changing = summary.changing
     unchanged = summary.discovered - len(changing) - len(summary.failing)
     logger.info(
         f"{'🔍' if changing else '⚠️'} "
@@ -384,6 +415,90 @@ def apply_migration(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
     return None
 
 
+def log_downgrade_summary(summary: DowngradeSummary, wrote: bool) -> None:
+    converted = len(summary.changing)
+    failing = len(summary.failing)
+    skipped = len(summary.skipped)
+    current = summary.discovered - converted - failing
+    total = summary.discovered + skipped
+    details = "".join(
+        text
+        for count, text in (
+            (current, f", {current} already in it"),
+            (skipped, f", {skipped} left as they are"),
+            (failing, f", {failing} would fail"),
+        )
+        if count
+    )
+    logger.info(
+        f"{('✔️' if wrote else '🔍') if converted else '⚠️'} "
+        f"{'Converted' if wrote else 'Would convert'} {converted} of {total} "
+        f"fastresume file{'' if total == 1 else 's'} to the libtorrent 1.2 "
+        f"format{details}.{'' if wrote else ' Nothing was written.'}"
+    )
+
+
+def run_downgrade(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
+    """`--downgrade-resume`: one format conversion, no path changes."""
+    given = [
+        name
+        for name, value in (
+            ("-e/--existing-path", args.existing_path),
+            ("-n/--new-path", args.new_path),
+            ("-r/--regex", args.regex),
+            ("-t/--target-os", args.target_os),
+        )
+        if value is not None
+    ]
+    if given:
+        logger.error(
+            f"❌ --downgrade-resume does not change paths and cannot be "
+            f"combined with {', '.join(given)}. Run the two separately."
+        )
+        return 2
+    # Checked for dry runs too: a preview of files qBittorrent will not read
+    # would suggest the conversion is going to help when it will not.
+    database = sqlite_resume_data(qbm.bt_backup_path)
+    if database is not None:
+        logger.error(SQLITE_DOWNGRADE_HINT.format(database=database))
+        return 2
+    # Same order as a path migration: a dry run writes nothing, so it skips
+    # the running-client check; a real run checks before the backup is made.
+    if not args.dry_run:
+        bail = preflight_qbittorrent(args)
+        if bail is not None:
+            return bail
+        if args.skip_backup:
+            logger.warning(
+                "⚠️ Skipping the backup archive. Make sure you have one "
+                "already."
+            )
+    try:
+        summary = downgrade_resume(
+            qbm.bt_backup_path,
+            write=not args.dry_run,
+            create_backup=not args.skip_backup,
+            skip_bad_files=args.skip_bad_files,
+        )
+    except (BencodeDecodeError, ValueError) as e:
+        logger.error(BAD_FILE_HINT.format(error=e))
+        return 1
+    except NotADirectoryError as e:
+        logger.error(BAD_BACKUP_PATH_HINT.format(error=e))
+        return 2
+    except FastResumeUpdateError as e:
+        logger.error(
+            f"❌ {len(e.failures)} file(s) were not converted. libtorrent 1.2 "
+            f"will recheck those torrents. Restore from the backup archive "
+            f"in the BT_backup directory if you need to start over."
+        )
+        return 1
+    if args.dry_run:
+        log_plan_details(summary, verbose=args.log_level == "DEBUG")
+    log_downgrade_summary(summary, wrote=not args.dry_run)
+    return None
+
+
 def main() -> int | None:
     args = parse_args(sys.argv[1:])
     configure_logging(args.log_level)
@@ -397,6 +512,8 @@ def main() -> int | None:
     qbm.bt_backup_path = resolve_bt_backup_path(
         args.bt_backup_path, qbm.bt_backup_path
     )
+    if args.downgrade_resume:
+        return run_downgrade(qbm, args)
     if args.existing_path is None:
         args.existing_path = prompt("Existing Path: ")
     if args.new_path is None:
