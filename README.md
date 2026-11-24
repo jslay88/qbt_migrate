@@ -43,7 +43,7 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
     options:
       -h, --help            show this help message and exit
       -e EXISTING_PATH, --existing-path EXISTING_PATH
-                            Existing root of path to look for.
+                            Existing root path. Matched at the start of each path, up to a folder boundary, and replaced once.
       -n NEW_PATH, --new-path NEW_PATH
                             New root path to replace existing root path with.
       -r, --regex           Existing and New paths are regex patterns. (Capture groups recommended).

@@ -44,11 +44,24 @@ same result. This was not true before 3.0, which is why older reports mention
 needing several passes ([#75](https://github.com/jslay88/qbt_migrate/issues/75)).
 
 The replacement is idempotent. Running the same command twice changes nothing
-the second time. If a second run does find work, that is a bug worth reporting.
+the second time, as long as the new path is not inside the existing one
+(`-e /data -n /data/old` moves things one level deeper on every run). If a
+second run does find work otherwise, that is a bug worth reporting.
+
+## Only the start of a path is replaced
+
+The existing path is matched at the start of each value, once, and only up to a
+folder boundary. `-e /data` rewrites `/data` and `/data/movies`, but leaves
+`/database`, `/srv/data/movies` and the second `data` in
+`/data/backup/data` alone.
+
+To change part of a path, such as a user name in the middle, use regex mode:
+`-r -e '/olduser/' -n '/newuser/'`. If a plain run finds nothing but the path
+appears further in, it says so and points here.
 
 ## Trailing slashes are yours to get right
 
-Replacement is a plain substring swap. The tool does not add or remove
+The matched prefix is swapped as is. The tool does not add or remove
 separators at the join, so the trailing slash has to match on both sides.
 
 | Command | `X:\Torrents\movie` becomes | |

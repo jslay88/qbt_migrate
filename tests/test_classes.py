@@ -149,7 +149,7 @@ def test_qbt_batch_move_run_replace_paths(monkeypatch, temp_dir):
     monkeypatch.setattr(qbt_migrate.classes, "FastResume", MockFastResume)
 
     qbt = QBTBatchMove(temp_dir)
-    qbt.run("existing", "new", create_backup=False)
+    qbt.run("existing_path", "new", create_backup=False)
     assert len(qbt.discovered_files) == 1
     for fast_resume in qbt.discovered_files:
         assert fast_resume.called
