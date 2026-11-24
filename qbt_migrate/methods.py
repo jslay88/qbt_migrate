@@ -1,7 +1,9 @@
 import logging
 import os
+import re
 import sys
 import zipfile
+from collections.abc import Sequence
 from pathlib import Path
 
 from qbt_migrate.enums import TargetOS
@@ -80,6 +82,49 @@ def replace_path(value: str, existing_path: str, new_path: str) -> str:
         if variant in value:
             return value.replace(variant, new_path)
     return value
+
+
+def first_match(
+    value: str, existing_paths: Sequence[str], regex_path: bool = False
+) -> int | None:
+    """Index of the first of `existing_paths` found in `value`, else None."""
+    # In order, so the user decides precedence: put a narrower root such as
+    # /data/tv before a broader one such as /data to keep it reachable.
+    for index, existing_path in enumerate(existing_paths):
+        if (
+            re.search(existing_path, value)
+            if regex_path
+            else matches_path(value, existing_path)
+        ):
+            return index
+    return None
+
+
+def map_path(
+    value: str,
+    mappings: Sequence[tuple[str, str]],
+    regex_path: bool = False,
+) -> str:
+    """Rewrite `value` with the first mapping whose existing path matches.
+
+    Only that one mapping is applied. Feeding its output into the next one
+    would chain rewrites, so `/a -> /b` followed by `/b -> /c` would quietly
+    turn `/a` into `/c`. With a single mapping this is exactly
+    `replace_path`, or `re.sub` in regex mode.
+    """
+    index = first_match(
+        value, [existing for existing, _ in mappings], regex_path
+    )
+    if index is None:
+        # Left as is. A target OS change still converts its separators later,
+        # in `set_save_paths`, same as with a single mapping.
+        return value
+    existing_path, new_path = mappings[index]
+    if regex_path:
+        # Same call as `pattern.sub` on master, so capture group references in
+        # `new_path` keep working.
+        return re.sub(existing_path, new_path, value)
+    return replace_path(value, existing_path, new_path)
 
 
 def bt_backup_path_candidates() -> list[Path]:
