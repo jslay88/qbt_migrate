@@ -218,30 +218,35 @@ class QBTBatchMove:
                         f"⚠️ Unable to parse {file}. Skipping!\n\n{e}"
                     )
                     continue
-                if (
-                    fast_resume.save_path is not None
-                    and matches_path(fast_resume.save_path, existing_path)
-                ) or (
-                    fast_resume.qbt_save_path is not None
-                    and matches_path(fast_resume.qbt_save_path, existing_path)
-                ):
+                paths = [
+                    path
+                    for path in (
+                        fast_resume.save_path,
+                        fast_resume.qbt_save_path,
+                    )
+                    if path is not None
+                ]
+                # qBt-downloadPath is the incomplete-downloads folder. A
+                # torrent can live there while its save path is elsewhere.
+                # Only a str is matched: a value that is not valid UTF-8
+                # decodes to bytes, and discovery never read this key before,
+                # so such a torrent must not start failing the whole run.
+                if isinstance(fast_resume.qbt_download_path, str):
+                    paths.append(fast_resume.qbt_download_path)
+                # Same rules for every key, so a torrent is relevant through
+                # its download path exactly as it is through its save path.
+                if any(matches_path(path, existing_path) for path in paths):
                     yield fast_resume
-                elif regex_path and (
-                    (
-                        fast_resume.save_path is not None
-                        and re.search(existing_path, fast_resume.save_path)
-                    )
-                    or (
-                        fast_resume.qbt_save_path is not None
-                        and re.search(existing_path, fast_resume.qbt_save_path)
-                    )
+                elif regex_path and any(
+                    re.search(existing_path, path) for path in paths
                 ):
                     yield fast_resume
                 else:
                     logger.debug(
                         f"FastResume {file} is not relevant, "
                         f"Save Path: {fast_resume.save_path}, "
-                        f"qBt-savePath: {fast_resume.qbt_save_path}"
+                        f"qBt-savePath: {fast_resume.qbt_save_path}, "
+                        f"qBt-downloadPath: {fast_resume.qbt_download_path}"
                     )
         return
 
