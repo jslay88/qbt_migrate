@@ -38,7 +38,7 @@ Install from PyPi using `pip`, or run with [Docker](#docker).
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
     usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-k] [--ignore-running] [-d] [-z]
-                       [-l {DEBUG,INFO}] [-v]
+                       [--downgrade-resume] [-l {DEBUG,INFO}] [-v]
 
     options:
       -h, --help            show this help message and exit
@@ -57,6 +57,7 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
       --ignore-running      Run even if qBittorrent is still running. Unsafe: it will overwrite your changes from memory when it exits.
       -d, --dry-run         Show what would change and exit without writing anything.
       -z, --skip-backup     Skips creating a backup zip archive of the BT_backup folder. Default behavior is to create a backup.
+      --downgrade-resume    Instead of changing paths, convert libtorrent 2.1 resume data (file-version 2) to the format libtorrent 1.2 reads, so a qBittorrent lt12 build does not recheck every torrent. Cannot be combined with -e, -n, -r or -t.
       -l {DEBUG,INFO}, --log-level {DEBUG,INFO}
                             Log Level, Default is INFO.
       -v, --version         Prints the current version number and exits.
@@ -109,6 +110,28 @@ Run with `-l DEBUG` to see which candidates were checked and which one was picke
 A backup zip archive is automatically created in the `BT_backup` directory. Pass `-z` /
 `--skip-backup` to skip it, which is worth doing when you already have one and are making
 a series of path changes over a large library, since zipping every run gets slow.
+
+### Going back to a libtorrent 1.2 build
+qBittorrent 5.3 builds on libtorrent 2.1 save resume data in a newer layout (`file-version`
+2, one bit per piece). The libtorrent 1.2 builds (`lt12`, the linuxserver `libtorrentv1`
+tag) read it as one byte per piece, so after switching back every torrent is rechecked.
+`--downgrade-resume` converts that data back to the layout 1.2 reads, which libtorrent 2.x
+also still reads. Close qBittorrent, then:
+
+    qbt_migrate --downgrade-resume -b /config/qBittorrent/BT_backup --dry-run
+    qbt_migrate --downgrade-resume -b /config/qBittorrent/BT_backup
+
+Paths are not changed. Files already in the old layout are left alone, as are torrents
+with no v1 piece hashes (v2-only torrents, which libtorrent 1.2 cannot load) and those
+that have piece data but no piece count to go with it (no `<hash>.torrent` and no
+metadata in the resume data). A resume file without piece data, such as a magnet that
+never got its metadata, only has its `file-version` changed. The backup archive, `-s`,
+`-k`, `-d` and `-z` work as for a path migration.
+
+If `torrents.db` sits next to `BT_backup`, qBittorrent loads from that SQLite database
+instead and the run stops with exit code 2. While still on the libtorrent 2.1 build, set
+Options -> Advanced -> Resume data storage type to "Fastresume files", start qBittorrent
+once so it converts and removes `torrents.db`, quit it, then run `--downgrade-resume`.
 
 ### Examples
 Assuming all of our torrents are in `X:\Torrents` when coming from Windows, or `/torrents` when coming from Linux/Mac
