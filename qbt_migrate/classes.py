@@ -13,6 +13,7 @@ from bencodepy.exceptions import BencodeDecodeError
 from qbt_migrate.enums import TargetOS
 from qbt_migrate.exceptions import FastResumeUpdateError
 from qbt_migrate.methods import (
+    atomic_write,
     backup_folder,
     convert_slashes,
     discover_bt_backup_path,
@@ -420,7 +421,9 @@ class FastResume:
         if file_name is None:
             file_name = self.file_path
         self.logger.debug(f"Saving File {file_name}...")
-        bencode.write(self._data, file_name)
+        # Encode before touching the file: bencode.write opens the target with
+        # 'wb' first, so a failure while encoding left a 0-byte .fastresume.
+        atomic_write(file_name, bencode.encode(self._data))
 
     def plan_paths(
         self,

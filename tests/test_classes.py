@@ -229,9 +229,6 @@ class MockFastResumeSaveCaller:
         if fn is not None:
             self.saved_file_names.add(fn)
 
-    def mock_write(self, _, fn):
-        self.mock_save(fn)
-
     def reset(self):
         self.__init__()
 
@@ -381,25 +378,37 @@ def test_fastresume_replace_paths_without_mapped_files(
     assert fast_resume.mapped_files is None
 
 
-def test_fastresume_save(monkeypatch, fastresume_path):
-    fast_resume = FastResume(fastresume_path("good.fastresume"))
-    mock = MockFastResumeSaveCaller()
-    monkeypatch.setattr(qbt_migrate.classes.bencode, "write", mock.mock_write)
+def test_fastresume_save(temp_dir, write_fastresume):
+    """save() writes to its own file by default, or to the name given."""
+    path = write_fastresume("a.fastresume", {"save_path": "/old"})
+    fast_resume = FastResume(path)
+    fast_resume._data["save_path"] = "/new"
 
-    # Test default call
+    # Default call writes back to the file it was read from
     fast_resume.save()
-    assert mock.called
-    assert len(mock.saved_file_names) == 1
-    for file_name in mock.saved_file_names:
-        assert file_name.name.endswith("good.fastresume")
+    assert FastResume(path).save_path == "/new"
 
-    mock.reset()
-    # Test calling with file name
-    fast_resume.save("test_file")
-    assert mock.called
-    assert len(mock.saved_file_names) == 1
-    for file_name in mock.saved_file_names:
-        assert file_name == "test_file"
+    # Calling with a file name writes there instead
+    other = temp_dir / "other.fastresume"
+    fast_resume.save(other)
+    assert FastResume(other).save_path == "/new"
+    assert sorted(p.name for p in temp_dir.iterdir()) == [
+        "a.fastresume",
+        "other.fastresume",
+    ]
+
+
+def test_fastresume_save_encode_failure_keeps_file(temp_dir, write_fastresume):
+    """An unencodable value must not leave a 0-byte .fastresume behind."""
+    path = write_fastresume("a.fastresume", {"save_path": "/old"})
+    before = path.read_bytes()
+    fast_resume = FastResume(path)
+    fast_resume._data["save_path"] = object()  # not bencodable
+
+    with pytest.raises(Exception):  # noqa: B017 - whatever bencode raises
+        fast_resume.save()
+    assert path.read_bytes() == before
+    assert list(temp_dir.iterdir()) == [path]
 
 
 def test_fastresume_replace_paths(fastresume_path):

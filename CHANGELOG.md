@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+Fixed:
+
+* `.fastresume` files are written atomically: to a temporary file in the same
+  directory, synced, then renamed over the original. A failure part way (a
+  value that cannot be encoded, a full disk, Ctrl-C) used to leave a truncated,
+  often 0 byte, file that qBittorrent drops on its next start; now the old file
+  stays as it was. The original's mode is kept, and its owner and group where
+  the OS allows it.
+
 ## 3.3.0 (2026-08-04)
 
 Added:
