@@ -1,5 +1,6 @@
 import argparse
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -302,8 +303,33 @@ def resolve_regex(regex: bool | None) -> bool:
     return answer in ("y", "yes")
 
 
+# A regex escape: `\g<name>`, or a backslash and the character after it.
+REGEX_ESCAPE = re.compile(r"\\g<[^>]*>|\\(.)", re.DOTALL)
+
+
+def regex_separators(pattern: str) -> str:
+    r"""`pattern` with every regex escape removed except escaped separators.
+
+    In a pattern or an `re.sub` replacement a lone backslash starts an escape
+    (`\w`, `\d`) or a backreference (`\1`, `\g<1>`); only `\\` stands for an
+    actual backslash. Auto-detection needs the separators the user meant, not
+    the escape characters.
+    """
+
+    def keep(match: re.Match[str]) -> str:
+        # `\/` is a needless but valid escape for `/`; dropping it would hide
+        # the only separator in a pattern written that way.
+        char = match.group(1)
+        return char if char in ("\\", "/") else ""
+
+    return REGEX_ESCAPE.sub(keep, pattern)
+
+
 def resolve_target_os(
-    target_os: str | None, existing_path: str, new_path: str
+    target_os: str | None,
+    existing_path: str,
+    new_path: str,
+    regex: bool = False,
 ) -> TargetOS | None:
     if target_os is None:
         target_os = prompt_until(
@@ -318,6 +344,11 @@ def resolve_target_os(
             else TargetOS.POSIX
         )
     # Blank, or nobody to ask. Infer from the separators in use.
+    if regex:
+        # `-n '/mnt/data/\1'` is a Linux path with a backreference, not a
+        # Windows one.
+        existing_path = regex_separators(existing_path)
+        new_path = regex_separators(new_path)
     if "/" in existing_path and "\\" in new_path:
         logger.info(
             "Auto detected target OS change. Will convert slashes to Windows."
@@ -411,7 +442,7 @@ def main() -> int | None:
 
     args.regex = resolve_regex(args.regex)
     args.target_os = resolve_target_os(
-        args.target_os, args.existing_path, args.new_path
+        args.target_os, args.existing_path, args.new_path, args.regex
     )
 
     logger.debug(
