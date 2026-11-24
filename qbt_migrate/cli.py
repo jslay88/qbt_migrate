@@ -99,6 +99,13 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--log-file",
+        metavar="PATH",
+        help="Also write a full DEBUG log to PATH, whatever -l is set to. "
+        "Appends if the file exists.",
+    )
+
+    parser.add_argument(
         "-v",
         "--version",
         help=f"Prints the current version number and exits. "
@@ -270,16 +277,56 @@ def preflight_qbittorrent(args: argparse.Namespace) -> int | None:
     return None
 
 
-def configure_logging(log_level: str) -> None:
-    fmt = (
-        "%(message)s"
-        if log_level == "INFO"
-        else "%(asctime)s :: %(levelname)s :: "
-        "%(name)s.%(funcName)s: %(message)s"
-    )
-    logging.basicConfig(format=fmt)
-    logger.setLevel(log_level)
-    logging.getLogger("qbt_migrate").setLevel(log_level)
+DEBUG_LOG_FORMAT = (
+    "%(asctime)s :: %(levelname)s :: %(name)s.%(funcName)s: %(message)s"
+)
+
+
+def check_log_file(log_file: str) -> None:
+    """Refuse a log path that is almost certainly a mistake.
+
+    :raises ValueError: For `--log-file=-z`, which argparse accepts and which
+        would create a file named `-z`, and for a `.fastresume` or `.torrent`
+        name, where appending log text would damage qBittorrent's own data.
+    """
+    if log_file.startswith("-"):
+        raise ValueError(f"'{log_file}' looks like an option, not a path")
+    if log_file.endswith((".fastresume", ".torrent")):
+        raise ValueError(f"'{log_file}' is a qBittorrent data file")
+
+
+def configure_logging(log_level: str, log_file: str | None = None) -> None:
+    """Log to the console at `log_level`, and to `log_file` at DEBUG.
+
+    The file always gets everything: it is read after the fact, usually to
+    work out why a path did not match, which is exactly what the DEBUG lines
+    show. Tying it to `-l` would mean also flooding the console and listing
+    every file in a dry run just to get a useful log. Appending keeps the
+    log of each pass when a migration takes several runs.
+
+    :raises OSError: If `log_file` cannot be opened for writing.
+    :raises ValueError: If `log_file` is refused by `check_log_file`.
+    """
+    fmt = "%(message)s" if log_level == "INFO" else DEBUG_LOG_FORMAT
+    # A handler of our own, so its level can stay at `log_level` while the
+    # loggers below are opened up to DEBUG for the file.
+    console = logging.StreamHandler()
+    console.setLevel(log_level)
+    logging.basicConfig(format=fmt, handlers=[console])
+    level = log_level
+    if log_file is not None:
+        check_log_file(log_file)
+        # UTF-8 explicitly: the messages carry emoji, which the locale
+        # encoding on Windows (cp1252) cannot write.
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter(DEBUG_LOG_FORMAT))
+        # On the root logger, so `python -m qbt_migrate.cli`, where this
+        # module logs as `__main__`, still gets its own lines in the file.
+        logging.getLogger().addHandler(file_handler)
+        level = "DEBUG"
+    logger.setLevel(level)
+    logging.getLogger("qbt_migrate").setLevel(level)
     logging.getLogger("qbt_migrate").propagate = True
 
 
@@ -386,7 +433,15 @@ def apply_migration(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
 
 def main() -> int | None:
     args = parse_args(sys.argv[1:])
-    configure_logging(args.log_level)
+    try:
+        configure_logging(args.log_level, args.log_file)
+    except (OSError, ValueError) as e:
+        # Checked before anything else runs, so a typo in the path costs
+        # nothing. 2, like every other unusable argument.
+        logger.error(f"❌ Cannot write the log file: {e}")
+        return 2
+    # First line of a log file that may end up attached to an issue.
+    logger.debug(f"qbt_migrate {__version__}")
     if args.version:
         logger.debug("Version Print requested.")
         logger.info(f"{__version__}")

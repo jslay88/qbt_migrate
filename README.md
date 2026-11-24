@@ -38,7 +38,7 @@ Install from PyPi using `pip`, or run with [Docker](#docker).
 Run the script and follow prompts or use CLI arguments with command `qbt_migrate`
 
     usage: qbt_migrate [-h] [-e EXISTING_PATH] [-n NEW_PATH] [-r] [-t {Windows,Linux,Mac}] [-b BT_BACKUP_PATH] [-s] [-k] [--ignore-running] [-d] [-z]
-                       [-l {DEBUG,INFO}] [-v]
+                       [-l {DEBUG,INFO}] [--log-file PATH] [-v]
 
     options:
       -h, --help            show this help message and exit
@@ -59,6 +59,7 @@ Run the script and follow prompts or use CLI arguments with command `qbt_migrate
       -z, --skip-backup     Skips creating a backup zip archive of the BT_backup folder. Default behavior is to create a backup.
       -l {DEBUG,INFO}, --log-level {DEBUG,INFO}
                             Log Level, Default is INFO.
+      --log-file PATH       Also write a full DEBUG log to PATH, whatever -l is set to. Appends if the file exists.
       -v, --version         Prints the current version number and exits.
 
 ### Check before you commit to it
