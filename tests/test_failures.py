@@ -6,7 +6,10 @@ success and the CLI exited 0. A partial migration was indistinguishable from a
 clean one, which is a large part of why users reported needing repeated passes.
 """
 
+from pathlib import Path
+
 import pytest
+from bencodepy.exceptions import BencodeDecodeError
 
 import qbt_migrate
 from qbt_migrate.classes import QBTBatchMove
@@ -90,6 +93,47 @@ def test_run_succeeds_quietly_with_nothing_to_do(temp_dir, caplog):
         qbt.run("/some/test", "/new", create_backup=False)
 
     assert "Updated 0 of 0 relevant fastresume files!" in caplog.text
+
+
+def test_unreadable_file_stops_run_before_any_write(
+    write_fastresume, temp_dir
+):
+    """Without skip_bad_files, no file is written if any cannot be read."""
+    good = write_fastresume("a.fastresume", dict(RELEVANT))
+    before = good.read_bytes()
+    # Sorts after the good file, which is the order that used to leak writes.
+    (temp_dir / "b.fastresume").write_bytes(b"not bencode")
+
+    qbt = QBTBatchMove(str(temp_dir))
+    with pytest.raises(BencodeDecodeError):
+        qbt.run("/some/test", "/new", create_backup=False)
+
+    assert good.read_bytes() == before
+    assert qbt.discovered_files == set()
+
+
+def test_interrupt_during_discovery_writes_nothing(
+    write_fastresume, temp_dir, monkeypatch
+):
+    """Ctrl-C while files are still being read leaves every file as it was."""
+    good = write_fastresume("a.fastresume", dict(RELEVANT))
+    before = good.read_bytes()
+    write_fastresume("b.fastresume", dict(RELEVANT))
+    original = qbt_migrate.classes.FastResume.__init__
+
+    def init(self, file_path):
+        # Simulate the user pressing Ctrl-C as discovery reaches "b".
+        if Path(file_path).name == "b.fastresume":
+            raise KeyboardInterrupt
+        original(self, file_path)
+
+    monkeypatch.setattr(qbt_migrate.classes.FastResume, "__init__", init)
+
+    qbt = QBTBatchMove(str(temp_dir))
+    with pytest.raises(KeyboardInterrupt):
+        qbt.run("/some/test", "/new", create_backup=False)
+
+    assert good.read_bytes() == before
 
 
 def test_max_workers_is_forwarded(write_fastresume, temp_dir, monkeypatch):

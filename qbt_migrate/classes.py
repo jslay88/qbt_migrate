@@ -49,6 +49,11 @@ class QBTBatchMove:
     ) -> None:
         """
         Perform Batch Processing of path changes.
+
+        Every relevant file is read before any is written, so without
+        `skip_bad_files` an unreadable file stops the run with no
+        .fastresume changed.
+
         :param existing_path: Existing path to look for
         :type existing_path: str
         :param new_path: New Path to replace with
@@ -83,17 +88,24 @@ class QBTBatchMove:
         self.logger.info(
             f"🕵️ Searching for .fastresume files with path {existing_path} ..."
         )
-        failures: dict[Path, BaseException] = {}
-        count = 0
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures: dict[Future[None], FastResume] = {}
-            for fast_resume in self.discover_relevant_fast_resume(
+        # Finish discovery before submitting anything. Discovery is lazy and
+        # raises at the first unreadable file, so writing as files were found
+        # had already rewritten everything sorted before it, while the caller
+        # was told nothing was changed. Memory is no worse: discovered_files
+        # holds every FastResume for the life of the batch anyway.
+        relevant = list(
+            self.discover_relevant_fast_resume(
                 self.bt_backup_path,
                 existing_path,
                 regex_path,
                 not skip_bad_files,
-            ):
-                count += 1
+            )
+        )
+        failures: dict[Path, BaseException] = {}
+        count = len(relevant)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures: dict[Future[None], FastResume] = {}
+            for fast_resume in relevant:
                 self.discovered_files.add(fast_resume)
                 futures[
                     pool.submit(
