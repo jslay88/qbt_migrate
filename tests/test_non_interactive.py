@@ -120,6 +120,25 @@ def test_unreadable_file_points_at_skip_bad_files(
     assert "-s/--skip-bad-files" in caplog.text
 
 
+def test_unreadable_file_means_nothing_was_changed(
+    write_fastresume, copy_fastresume, temp_dir, cli_args, caplog
+):
+    """The good file sorted before the bad one must not have been written."""
+    # "a" sorts before "bad", so lazy discovery used to hand it to a writer
+    # before reaching the unreadable file, behind "Nothing was changed".
+    good = write_fastresume("a.fastresume", dict(RELEVANT))
+    copy_fastresume("bad.fastresume")
+    cli_args("-b", str(temp_dir), "-e", "/some/test", "-n", "/new")
+
+    with caplog.at_level("ERROR", logger="qbt_migrate.cli"):
+        assert main() == 1
+
+    assert "Nothing was changed" in caplog.text
+    from qbt_migrate.classes import FastResume
+
+    assert FastResume(good).save_path == "/some/test/path"
+
+
 def test_skip_bad_files_migrates_the_rest(
     write_fastresume, copy_fastresume, temp_dir, cli_args
 ):
