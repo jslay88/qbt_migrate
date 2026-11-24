@@ -241,6 +241,10 @@ def test_main_blank_bt_backup_path_keeps_default(
     # Pressing enter at the BT_backup prompt keeps whatever the platform
     # default resolved to rather than setting an empty path.
     monkeypatch.setattr("qbt_migrate.cli.QBTBatchMove", MockQBTBatchMove)
+    # The mock's default path is None, which no real path check accepts.
+    monkeypatch.setattr(
+        "qbt_migrate.cli.find_sqlite_resume_data", lambda _: None
+    )
     cli_args("-e", "e-path", "-n", "n-path", "-r", "-t", "Linux")
     monkeypatch.setattr("builtins.input", lambda _: "  ")
     main()

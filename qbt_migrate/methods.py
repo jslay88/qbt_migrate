@@ -148,3 +148,21 @@ def discover_bt_backup_path() -> Path:
         f"Checked: {', '.join(str(path) for path in candidates)}"
     )
     return candidates[0]
+
+
+def find_sqlite_resume_data(bt_backup_path: str | Path) -> Path | None:
+    """qBittorrent's SQLite resume database next to BT_backup, if present.
+
+    qBittorrent keeps `torrents.db` and `BT_backup` side by side in its data
+    directory, and loads torrents from `torrents.db` whenever that file
+    exists: as its storage with "SQLite database (experimental)" selected, and
+    once more to convert back after switching to "Fastresume files". Either
+    way the `.fastresume` files are not what it reads on its next start.
+    See `SessionImpl::prepareStartup` in qBittorrent's
+    src/base/bittorrent/sessionimpl.cpp.
+    """
+    # absolute(), so `-b .` run from inside BT_backup looks one level up and
+    # not at itself. Not resolve(): qBittorrent uses the lexical parent of
+    # BT_backup, even when BT_backup is a symlink.
+    database = Path(bt_backup_path).absolute().parent / "torrents.db"
+    return database if database.is_file() else None
