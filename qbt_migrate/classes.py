@@ -17,6 +17,7 @@ from qbt_migrate.methods import (
     convert_slashes,
     discover_bt_backup_path,
     matches_path,
+    occurs_in,
     replace_path,
 )
 from qbt_migrate.names import torrent_name
@@ -196,6 +197,8 @@ class QBTBatchMove:
         :rtype: list[FastResume]
         """
         bt_backup_path = Path(bt_backup_path)
+        found = 0
+        mid_path = False
         # Sorted so processing order (and therefore log output) is reproducible
         # across runs and filesystems.
         for file in sorted(bt_backup_path.iterdir()):
@@ -225,6 +228,7 @@ class QBTBatchMove:
                     fast_resume.qbt_save_path is not None
                     and matches_path(fast_resume.qbt_save_path, existing_path)
                 ):
+                    found += 1
                     yield fast_resume
                 elif regex_path and (
                     (
@@ -236,13 +240,33 @@ class QBTBatchMove:
                         and re.search(existing_path, fast_resume.qbt_save_path)
                     )
                 ):
+                    found += 1
                     yield fast_resume
                 else:
+                    mid_path = mid_path or (
+                        not regex_path
+                        and (
+                            occurs_in(fast_resume.save_path, existing_path)
+                            or occurs_in(
+                                fast_resume.qbt_save_path, existing_path
+                            )
+                        )
+                    )
                     logger.debug(
                         f"FastResume {file} is not relevant, "
                         f"Save Path: {fast_resume.save_path}, "
                         f"qBt-savePath: {fast_resume.qbt_save_path}"
                     )
+        if not found and mid_path:
+            # Plain mode used to match mid-path too, so a command such as
+            # `-e olduser -n newuser` that worked on 3.3 would otherwise end
+            # with "0 of 0" and no reason given.
+            cls.logger.warning(
+                f"⚠️ {existing_path} appears inside some paths but at the "
+                f"start of none. -e is matched at the start of each path; "
+                f"to change part of a path use -r, e.g. "
+                f"-r -e '/olduser/' -n '/newuser/'"
+            )
         return
 
     @classmethod

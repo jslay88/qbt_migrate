@@ -62,24 +62,66 @@ def separator_variants(path: str) -> list[str]:
     return variants
 
 
+# Either one can end a folder name: a fastresume may hold either convention,
+# or both, whatever platform the client was on (see `separator_variants`).
+SEPARATORS = ("/", "\\")
+
+
+def leading_variant(value: str, existing_path: str) -> str | None:
+    """The form of `existing_path` that `value` starts with, if any.
+
+    Only a match at the start of `value` counts, and only when it ends at a
+    folder boundary: the end of `value`, a separator after it, or a separator
+    at the end of `existing_path` itself. So `/data` matches `/data` and
+    `/data/x`, but not `/database`, `/srv/data/x` or a second `/data` further
+    along.
+    """
+    for variant in separator_variants(existing_path):
+        if not value.startswith(variant):
+            continue
+        rest = value[len(variant) :]
+        # A trailing separator on `-e` is a boundary already, which keeps the
+        # documented `-e 'X:\' -n /torrents/` form working.
+        if (
+            not rest
+            or rest.startswith(SEPARATORS)
+            or variant.endswith(SEPARATORS)
+        ):
+            return variant
+    return None
+
+
 def matches_path(value: str, existing_path: str) -> bool:
-    """Is `existing_path` present in `value` under any separator convention?"""
-    return any(
+    """Does `value` start with `existing_path`, under either convention?"""
+    return leading_variant(value, existing_path) is not None
+
+
+def occurs_in(value: str | None, existing_path: str) -> bool:
+    """Is `existing_path` anywhere in `value`, under either convention?
+
+    Not used for matching. Only to explain an empty result when the path was
+    there, just not at the start (`discover_relevant_fast_resume`).
+    """
+    return value is not None and any(
         variant in value for variant in separator_variants(existing_path)
     )
 
 
 def replace_path(value: str, existing_path: str, new_path: str) -> str:
-    """Replace `existing_path` with `new_path` in `value`.
+    """Replace the leading `existing_path` in `value` with `new_path`.
 
     Matches `existing_path` under any separator convention but substitutes
-    `new_path` exactly as given. Mixed separators in the untouched remainder
-    are normalized later by `convert_slashes`, once, if a target OS is set.
+    `new_path` exactly as given, once, at the start. Mixed separators in the
+    untouched remainder are normalized later by `convert_slashes`, once, if a
+    target OS is set.
     """
-    for variant in separator_variants(existing_path):
-        if variant in value:
-            return value.replace(variant, new_path)
-    return value
+    variant = leading_variant(value, existing_path)
+    if variant is None:
+        return value
+    # Only the leading copy. A later `/data` is a folder of the same name
+    # inside the torrent's tree, and replacing that too is what made
+    # `-e /data -n /mnt/data` add another level on every run.
+    return new_path + value[len(variant) :]
 
 
 def bt_backup_path_candidates() -> list[Path]:
