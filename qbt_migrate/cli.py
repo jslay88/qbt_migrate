@@ -8,6 +8,7 @@ from bencodepy.exceptions import BencodeDecodeError
 from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
 from qbt_migrate.enums import TargetOS
 from qbt_migrate.exceptions import FastResumeUpdateError
+from qbt_migrate.methods import find_sqlite_resume_data
 from qbt_migrate.plans import MigrationPlan, PlanSummary
 from qbt_migrate.process import find_processes, stop_processes
 
@@ -119,6 +120,20 @@ BAD_FILE_HINT = (
 BAD_BACKUP_PATH_HINT = (
     "❌ BT_backup path is not a directory: {error}\n"
     "Point -b/--bt-backup-path at your qBittorrent BT_backup folder."
+)
+
+SQLITE_STORAGE_HINT = (
+    "❌ Found {database}: qBittorrent keeps resume data in an SQLite "
+    "database, which qbt_migrate cannot edit. qBittorrent loads torrents "
+    "from that file on its next start, so changing the .fastresume files "
+    "would have no effect.\n"
+    "Nothing was changed. To use qbt_migrate, set Options -> "
+    'Advanced -> Resume data storage type to "Fastresume files", start '
+    "qBittorrent once so it writes the .fastresume files and removes "
+    "torrents.db, quit it, then run qbt_migrate again. If qBittorrent "
+    "does not use this torrents.db (version 4.3 or older, a copied "
+    "BT_backup, or the file is still there after that restart), move it "
+    "somewhere else and run qbt_migrate again."
 )
 
 INTERACTIVE_ONLY_HINT = (
@@ -290,6 +305,20 @@ def resolve_bt_backup_path(bt_backup_path: str | None, default: Path) -> Path:
     return Path(answer) if answer else default
 
 
+def check_resume_storage(bt_backup_path: Path) -> int | None:
+    """Refuse when qBittorrent reads its resume data from SQLite.
+
+    Without this the run found no `.fastresume` files (or only stale ones
+    from before the switch), reported "Updated 0 of 0" and exited 0, so it
+    looked like a successful migration that changed nothing.
+    """
+    database = find_sqlite_resume_data(bt_backup_path)
+    if database is None:
+        return None
+    logger.error(SQLITE_STORAGE_HINT.format(database=database))
+    return 2
+
+
 def resolve_regex(regex: bool | None) -> bool:
     if regex is not None:
         return regex
@@ -397,6 +426,9 @@ def main() -> int | None:
     qbm.bt_backup_path = resolve_bt_backup_path(
         args.bt_backup_path, qbm.bt_backup_path
     )
+    bail = check_resume_storage(qbm.bt_backup_path)
+    if bail is not None:
+        return bail
     if args.existing_path is None:
         args.existing_path = prompt("Existing Path: ")
     if args.new_path is None:
