@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import sys
@@ -18,17 +19,28 @@ def backup_folder(
     logger.info(f"🗄️ Creating Archive {archive_path} ...")
     folder_path = Path(folder_path)
     archive_path = Path(archive_path)
-    with zipfile.ZipFile(archive_path, "w") as archive:
-        for file in sorted(folder_path.iterdir()):
-            if file.name.endswith(".fastresume") or (
-                include_torrents and file.name.endswith(".torrent")
-            ):
-                logger.debug(f"Archiving {file} into {archive_path}...")
-                # Flat entries. Without an arcname, zipfile stores the whole
-                # source path minus the leading separator, so restoring meant
-                # digging the files out of a nested directory tree that
-                # mirrored the machine the backup was taken on.
-                archive.write(file, arcname=file.name)
+    archive = zipfile.ZipFile(archive_path, "w")
+    try:
+        with archive:
+            for file in sorted(folder_path.iterdir()):
+                if file.name.endswith(".fastresume") or (
+                    include_torrents and file.name.endswith(".torrent")
+                ):
+                    logger.debug(f"Archiving {file} into {archive_path}...")
+                    # Flat entries. Without an arcname, zipfile stores the
+                    # whole source path minus the leading separator, so
+                    # restoring meant digging the files out of a nested
+                    # directory tree that mirrored the machine the backup was
+                    # taken on.
+                    archive.write(file, arcname=file.name)
+    except BaseException:
+        # A truncated zip (disk full, a pre-1980 mtime zipfile refuses,
+        # Ctrl-C) looks like a backup but cannot be restored from. Only the
+        # archive opened above is removed; if it could not be opened, there
+        # is nothing of ours to remove.
+        with contextlib.suppress(OSError):
+            archive_path.unlink()
+        raise
     logger.info("✔️ Done!")
 
 

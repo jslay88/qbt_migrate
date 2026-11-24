@@ -1,5 +1,6 @@
 import argparse
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from bencodepy.exceptions import BencodeDecodeError
 
 from qbt_migrate import QBTBatchMove, __version__, discover_bt_backup_path
 from qbt_migrate.enums import TargetOS
-from qbt_migrate.exceptions import FastResumeUpdateError
+from qbt_migrate.exceptions import BackupError, FastResumeUpdateError
 from qbt_migrate.plans import MigrationPlan, PlanSummary
 from qbt_migrate.process import find_processes, stop_processes
 
@@ -119,6 +120,20 @@ BAD_FILE_HINT = (
 BAD_BACKUP_PATH_HINT = (
     "❌ BT_backup path is not a directory: {error}\n"
     "Point -b/--bt-backup-path at your qBittorrent BT_backup folder."
+)
+
+BAD_REGEX_HINT = (
+    "❌ {name} is not valid with -r/--regex: {error}\n"
+    "Nothing was changed. -e is a Python regular expression and -n its "
+    "replacement (\\1 for the first group). Put both in single quotes so the "
+    "shell passes them through unchanged."
+)
+
+BACKUP_FAILED_HINT = (
+    "❌ {error}\n"
+    "Nothing was changed. Free up space or fix the permissions on the "
+    "BT_backup directory, or pass -z/--skip-backup if you already have a "
+    "backup."
 )
 
 INTERACTIVE_ONLY_HINT = (
@@ -332,6 +347,30 @@ def resolve_target_os(
     return None
 
 
+def check_regex(existing_path: str, new_path: str) -> int | None:
+    """Reject a pattern or replacement `re` cannot use, before any work.
+
+    Otherwise `re.error` surfaced from the middle of discovery as a traceback
+    with exit code 1, and a bad group reference in `-n` only failed per file,
+    after the backup had been taken. Substituting into an empty string is
+    enough to make `re` parse the replacement template.
+    """
+    try:
+        pattern = re.compile(existing_path)
+    # `re` raises OverflowError, not re.error, for a repeat count beyond its
+    # limit, e.g. `a{4294967296}`.
+    except (re.error, OverflowError) as e:
+        logger.error(BAD_REGEX_HINT.format(name="-e/--existing-path", error=e))
+        return 2
+    try:
+        pattern.sub(new_path, "")
+    # And IndexError for an unknown named group, `\g<nope>`.
+    except (re.error, IndexError) as e:
+        logger.error(BAD_REGEX_HINT.format(name="-n/--new-path", error=e))
+        return 2
+    return None
+
+
 def preview_migration(
     qbm: QBTBatchMove, args: argparse.Namespace
 ) -> int | None:
@@ -373,6 +412,9 @@ def apply_migration(qbm: QBTBatchMove, args: argparse.Namespace) -> int | None:
     except NotADirectoryError as e:
         logger.error(BAD_BACKUP_PATH_HINT.format(error=e))
         return 2
+    except BackupError as e:
+        logger.error(BACKUP_FAILED_HINT.format(error=e))
+        return 1
     except FastResumeUpdateError as e:
         logger.error(
             f"❌ {len(e.failures)} file(s) were not updated. "
@@ -410,6 +452,10 @@ def main() -> int | None:
             return 2
 
     args.regex = resolve_regex(args.regex)
+    if args.regex:
+        bail = check_regex(args.existing_path, args.new_path)
+        if bail is not None:
+            return bail
     args.target_os = resolve_target_os(
         args.target_os, args.existing_path, args.new_path
     )

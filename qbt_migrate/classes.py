@@ -11,7 +11,7 @@ import bencodepy
 from bencodepy.exceptions import BencodeDecodeError
 
 from qbt_migrate.enums import TargetOS
-from qbt_migrate.exceptions import FastResumeUpdateError
+from qbt_migrate.exceptions import BackupError, FastResumeUpdateError
 from qbt_migrate.methods import (
     backup_folder,
     convert_slashes,
@@ -76,9 +76,13 @@ class QBTBatchMove:
                 f"fastresume_backup"
                 f"{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
             )
-            backup_folder(
-                self.bt_backup_path, self.bt_backup_path / backup_filename
-            )
+            archive_path = self.bt_backup_path / backup_filename
+            try:
+                backup_folder(self.bt_backup_path, archive_path)
+            except OSError as e:
+                # Nothing has been written yet; say so instead of a bare
+                # traceback (read-only BT_backup, disk full).
+                raise BackupError(archive_path, e) from e
 
         self.logger.info(
             f"🕵️ Searching for .fastresume files with path {existing_path} ..."
